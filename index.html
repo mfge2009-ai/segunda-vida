@@ -962,60 +962,161 @@ async function buscarISBN(){
     if (!confirm(`Ya hay un ejemplar de este ISBN en el programa (${yaEsta.codigo} — ${nombreCons(c)}). ¿Ingresar otro ejemplar igual?`)) { $('#isbnIn').value=''; return; }
   }
   toast('Buscando el libro…');
-  const datos = await consultarISBN(isbn);
+  const r = await consultarISBN(isbn);
   $('#isbnIn').value = ''; $('#isbnIn').focus();
-  if (!datos){
-    toast('No se encontró el ISBN. Complétalo a mano.','err');
+  if (!r.datos){
+    toast(r.aviso || 'No se encontró el ISBN. Complétalo a mano.', 'err');
     abrirLibro(null, true, { isbn });
     return;
   }
-  abrirLibro(null, true, datos);
+  toast('Datos tomados de ' + r.datos.fuente, 'ok');
+  abrirLibro(null, true, r.datos);
 }
 
+/* Orden de búsqueda, del más rápido y confiable al más general:
+   1. Libros ya ingresados en Segunda Vida (memoria, instantáneo)
+   2. Catálogo de productos del POS de La Madriguera (trae también el precio)
+   3. Google Books
+   4. Open Library                                                            */
 async function consultarISBN(isbn){
-  // 1) Google Books
+  const [interno, pos, ext] = await Promise.all([
+    buscarEnPrograma(isbn), buscarEnPOS(isbn), buscarEnCatalogosWeb(isbn)
+  ]);
+  const base = interno || pos;
+  const web = ext.datos;
+
+  if (!base && !web){
+    return { datos:null, aviso: ext.limite
+      ? 'Los catálogos web están saturados en este momento y el libro no está en tu POS. Complétalo a mano.'
+      : 'Este ISBN no está en tu POS ni en los catálogos web. Complétalo a mano.' };
+  }
+  if (base && !web) return { datos: base };
+  if (!base && web)  return { datos: web };
+
+  // Se combinan: lo propio manda en título, autor y precio; la web completa lo demás.
+  const d = Object.assign({}, web, base);
+  if (!d.titulo || esTituloRecortado(d.titulo)) d.titulo = web.titulo || d.titulo;
+  if (!d.autor) d.autor = web.autor || '';
+  d.editorial   = d.editorial   || web.editorial || '';
+  d.anio        = d.anio        || web.anio || '';
+  d.categoria   = d.categoria   || web.categoria || '';
+  d.descripcion = d.descripcion || web.descripcion || '';
+  d.portadaUrl  = d.portadaUrl  || web.portadaUrl || '';
+  d.fuente = base.fuente + ' + ' + web.fuente;
+  return { datos: d };
+}
+
+/* --- 1. ejemplares ya registrados en el programa --- */
+async function buscarEnPrograma(isbn){
+  const l = S.libros.find(x => limpiarISBN(x.isbn) === isbn);
+  if (!l) return null;
+  return {
+    isbn, titulo:l.titulo, autor:l.autor||'', editorial:l.editorial||'', anio:l.anio||'',
+    categoria:l.categoria||'', descripcion:l.descripcion||'', portadaUrl:l.portadaUrl||'',
+    precioNuevoEst: l.precioNuevoEst || 0,
+    fuente:'un ejemplar ya ingresado'
+  };
+}
+
+/* --- 2. catálogo de productos del POS (colección productos/) --- */
+async function buscarEnPOS(isbn){
+  if (S.modo !== 'nube' || !S.db) return null;
   try{
-    const r = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + encodeURIComponent(isbn));
-    const j = await r.json();
-    if (j.totalItems > 0){
-      const v = j.items[0].volumeInfo || {};
-      return {
-        isbn,
-        titulo: v.title + (v.subtitle ? ': ' + v.subtitle : ''),
-        autor: (v.authors||[]).join(', '),
-        editorial: v.publisher || '',
-        anio: (v.publishedDate||'').slice(0,4),
-        paginas: v.pageCount || '',
-        idioma: v.language || '',
-        categoria: mapearCategoria((v.categories||[]).join(' ')),
-        descripcion: (v.description||'').slice(0,900),
-        portadaUrl: v.imageLinks ? (v.imageLinks.thumbnail||v.imageLinks.smallThumbnail||'').replace(/^http:/,'https:') : '',
-        fuente:'Google Books'
-      };
-    }
-  }catch(e){ /* sigue con OpenLibrary */ }
-  // 2) Open Library
+    const q = await S.db.collection('productos').where('code','==',isbn).limit(1).get();
+    if (q.empty) return null;
+    const p = q.docs[0].data();
+    return {
+      isbn,
+      titulo: normalizarTitulo(p.name || ''),
+      autor: p.author || '',
+      categoria: mapearCategoria([p.subcategory, p.category].join(' ')),
+      precioNuevoEst: Number(p.price) || 0,
+      fuente: 'el catálogo del POS'
+    };
+  }catch(e){ return null; }
+}
+
+/* --- 3 y 4. catálogos web públicos --- */
+async function buscarEnCatalogosWeb(isbn){
+  // Google Books, con un reintento si responde saturado (429)
+  for (let intento = 0; intento < 2; intento++){
+    try{
+      const r = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + encodeURIComponent(isbn));
+      if (r.status === 429){ await new Promise(x=>setTimeout(x, 900)); continue; }
+      const j = await r.json();
+      if (j.totalItems > 0){
+        const v = j.items[0].volumeInfo || {};
+        return { datos: {
+          isbn,
+          titulo: v.title + (v.subtitle ? ': ' + v.subtitle : ''),
+          autor: (v.authors||[]).join(', '),
+          editorial: v.publisher || '',
+          anio: (v.publishedDate||'').slice(0,4),
+          paginas: v.pageCount || '',
+          idioma: v.language || '',
+          categoria: mapearCategoria((v.categories||[]).join(' ')),
+          descripcion: (v.description||'').slice(0,900),
+          portadaUrl: v.imageLinks ? (v.imageLinks.thumbnail||v.imageLinks.smallThumbnail||'').replace(/^http:/,'https:') : '',
+          fuente:'Google Books'
+        }};
+      }
+      break;
+    }catch(e){ break; }
+  }
+  // Open Library
   try{
     const r = await fetch('https://openlibrary.org/api/books?bibkeys=ISBN:' + encodeURIComponent(isbn) + '&format=json&jscmd=data');
     const j = await r.json();
     const k = 'ISBN:' + isbn;
     if (j[k]){
       const v = j[k];
-      return {
+      return { datos: {
         isbn,
         titulo: v.title + (v.subtitle ? ': ' + v.subtitle : ''),
         autor: (v.authors||[]).map(a=>a.name).join(', '),
         editorial: (v.publishers||[]).map(p=>p.name).join(', '),
         anio: (v.publish_date||'').match(/\d{4}/) ? v.publish_date.match(/\d{4}/)[0] : '',
         paginas: v.number_of_pages || '',
-        categoria: mapearCategoria((v.subjects||[]).map(s=>s.name).join(' ')),
+        categoria: mapearCategoria((v.subjects||[]).map(x=>x.name).join(' ')),
         descripcion: (v.notes && v.notes.value) ? String(v.notes.value).slice(0,900) : '',
         portadaUrl: v.cover ? (v.cover.medium || v.cover.small || '') : '',
         fuente:'Open Library'
-      };
+      }};
     }
   }catch(e){}
-  return null;
+  return { datos:null, limite:true };
+}
+
+/* Los nombres del POS vienen en mayúsculas y recortados a 40 caracteres */
+function normalizarTitulo(t){
+  const s = String(t||'').trim();
+  if (!s) return '';
+  if (/[a-záéíóúñ]/.test(s)) return s;               // ya tiene minúsculas, se respeta
+  const menores = ['de','del','la','el','los','las','y','en','un','una','a','al','con','por','para'];
+  return s.toLowerCase().split(/\s+/).map((p,i)=> (i>0 && menores.includes(p)) ? p : p.charAt(0).toUpperCase()+p.slice(1)).join(' ');
+}
+function esTituloRecortado(t){ const s=String(t||''); return s.length >= 38 && !/[.!?]$/.test(s); }
+
+/* Búsqueda por título desde la ficha, cuando el ISBN no dio resultados */
+async function buscarPorTitulo(){
+  const tit = $('#lTit').value.trim(), aut = $('#lAut').value.trim();
+  if (tit.length < 3) return toast('Escribe primero el título','err');
+  toast('Buscando por título…');
+  try{
+    const q = 'intitle:' + encodeURIComponent(tit) + (aut ? '+inauthor:' + encodeURIComponent(aut) : '');
+    const r = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=1');
+    if (r.status === 429) return toast('Google Books está saturado. Intenta en un momento.','err');
+    const j = await r.json();
+    if (!j.totalItems) return toast('No se encontró ese título','err');
+    const v = j.items[0].volumeInfo || {};
+    if (!$('#lAut').value && v.authors) $('#lAut').value = v.authors.join(', ');
+    if (!$('#lEd').value && v.publisher) $('#lEd').value = v.publisher;
+    if (!$('#lAnio').value && v.publishedDate){ $('#lAnio').value = v.publishedDate.slice(0,4); autoAntiguedad(); }
+    if (!$('#lCat').value){ const c = mapearCategoria((v.categories||[]).join(' ')); if (c){ $('#lCat').value = c; autoDemanda(); } }
+    if (!$('#lDesc').value && v.description) $('#lDesc').value = v.description.slice(0,900);
+    if (!$('#lPort').value && v.imageLinks){ $('#lPort').value = (v.imageLinks.thumbnail||'').replace(/^http:/,'https:'); verPortada(); }
+    toast('Completado con Google Books','ok');
+  }catch(e){ toast('No se pudo consultar: ' + e.message,'err'); }
 }
 
 function mapearCategoria(txt){
@@ -1094,7 +1195,7 @@ function abrirLibro(id, esNuevo, pre){
     <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin-bottom:9px">Datos del libro</h4>
     <div class="grid g2">
       <label class="f"><span>ISBN</span><input type="text" id="lIsbn" class="mono" value="${esc(l.isbn||'')}"></label>
-      <label class="f"><span>Título *</span><input type="text" id="lTit" value="${esc(l.titulo||'')}"></label>
+      <label class="f"><span>Título * <em>— <a href="#" onclick="buscarPorTitulo();return false">completar desde Google Books</a></em></span><input type="text" id="lTit" value="${esc(l.titulo||'')}"></label>
       <label class="f"><span>Autor</span><input type="text" id="lAut" value="${esc(l.autor||'')}"></label>
       <label class="f"><span>Editorial</span><input type="text" id="lEd" value="${esc(l.editorial||'')}"></label>
       <label class="f"><span>Año</span><input type="number" id="lAnio" value="${esc(l.anio||'')}" onchange="autoAntiguedad()"></label>
@@ -1151,6 +1252,9 @@ function abrirLibro(id, esNuevo, pre){
 
   pintarThumbs(); verPortada(); recalc();
   if (l.precioFinal) $('#lFinal').value = l.precioFinal;
+  // ingreso rápido: si no hay título todavía, el cursor arranca ahí
+  if (!id && !l.titulo) setTimeout(()=>{ const t=$('#lTit'); if(t) t.focus(); }, 120);
+  else if (!id && !l.precioNuevoEst) setTimeout(()=>{ const t=$('#lBase'); if(t) t.focus(); }, 120);
 }
 
 function autoDemanda(){ const cat = $('#lCat').value; const d = DEMANDA_POR_CAT[cat]; if (d){ const el = $('#lDem_'+d); if (el) el.checked = true; } recalc(); }
