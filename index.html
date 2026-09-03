@@ -477,6 +477,7 @@ tr:hover td{background:#FDFCFA}
   <div class="card">
     <h3>Conexión con el POS</h3>
     <p class="sub">El POS ya tiene su módulo de consignación “Tu libro tiene otra vida”. Segunda Vida escribe ahí los libros aprobados para que se vendan escaneando, y trae de vuelta las ventas para calcular el reparto. El archivo del POS no se modifica.</p>
+    <div class="note warn"><b>Regla de trabajo:</b> los libros se dan de alta únicamente aquí. En el POS solo se venden. Un libro creado en el POS entra a exhibición sin contrato firmado ni aprobación de precio del consignante; si eso pasa, el panel te avisa y lo puedes regularizar desde “Ver qué hay en el POS”.</div>
     <label class="check"><input type="checkbox" id="cfgPOS">
       <span><b>Mantener el POS sincronizado.</b> Al marcar un libro como publicado se envía al POS, y al abrir la app se traen las ventas registradas allí.</span></label>
     <div class="row">
@@ -537,7 +538,8 @@ const S = {
   lote:[],                 // ids de libros del ingreso en curso
   cfg:null,
   db:null, auth:null,
-  camStream:null, camLoop:null
+  camStream:null, camLoop:null,
+  altasPOS: []          // libros creados directamente en el POS, sin ficha aquí
 };
 
 /* ---------------- configuración por defecto ---------------- */
@@ -771,7 +773,10 @@ async function cargarTodo(){
   }
   recalcularVencidos(false);
   await sincronizarAprobaciones();
-  if (S.modo === 'nube' && S.cfg.sincronizarPOS !== false) await importarVentasPOS(false);
+  if (S.modo === 'nube' && S.cfg.sincronizarPOS !== false){
+    await importarVentasPOS(false);
+    await revisarAltasPOS();
+  }
 }
 
 function construirNav(){
@@ -1969,18 +1974,21 @@ function pintarPanel(){
   ].join('');
 
   const alertas = [];
-  if (cnt('pendiente_revision')) alertas.push(['t-gris', cnt('pendiente_revision')+' libro(s) sin revisar', 'inventario']);
-  if (cnt('aceptado')) alertas.push(['t-azul', cnt('aceptado')+' libro(s) aceptados sin enviar a aprobación', 'ingreso']);
-  if (cnt('pendiente_aprobacion')) alertas.push(['t-oro', cnt('pendiente_aprobacion')+' libro(s) esperando respuesta del consignante', 'aprobaciones']);
-  if (cnt('aprobado')) alertas.push(['t-verde', cnt('aprobado')+' libro(s) aprobados listos para publicar', 'inventario']);
-  if (porPagar > 0) alertas.push(['t-terra', money(porPagar)+' por liquidar a consignantes', 'ventas']);
-  if (cnt('vencido')) alertas.push(['t-rojo', cnt('vencido')+' libro(s) vencidos: avisar para retiro o extensión', 'inventario']);
+  if (S.altasPOS.length) alertas.push(['t-rojo', S.altasPOS.length + ' libro(s) dados de alta en el POS, sin ficha ni contrato aquí', "verEstadoPOS()"]);
+  const sinAprobacion = L.filter(l => ['aprobado','publicado','vencido'].includes(l.estado) && !l.aprobacion).length;
+  if (sinAprobacion) alertas.push(['t-oro', sinAprobacion + ' libro(s) en exhibición sin aprobación de precio registrada', "irA('inventario')"]);
+  if (cnt('pendiente_revision')) alertas.push(['t-gris', cnt('pendiente_revision')+' libro(s) sin revisar', "irA('inventario')"]);
+  if (cnt('aceptado')) alertas.push(['t-azul', cnt('aceptado')+' libro(s) aceptados sin enviar a aprobación', "irA('ingreso')"]);
+  if (cnt('pendiente_aprobacion')) alertas.push(['t-oro', cnt('pendiente_aprobacion')+' libro(s) esperando respuesta del consignante', "irA('aprobaciones')"]);
+  if (cnt('aprobado')) alertas.push(['t-verde', cnt('aprobado')+' libro(s) aprobados listos para publicar', "irA('inventario')"]);
+  if (porPagar > 0) alertas.push(['t-terra', money(porPagar)+' por liquidar a consignantes', "irA('ventas')"]);
+  if (cnt('vencido')) alertas.push(['t-rojo', cnt('vencido')+' libro(s) vencidos: avisar para retiro o extensión', "irA('inventario')"]);
   const sinTerm = S.cons.filter(c=>!c.aceptaTerminos).length;
-  if (sinTerm) alertas.push(['t-rojo', sinTerm+' consignante(s) sin aceptar términos', 'consignantes']);
+  if (sinTerm) alertas.push(['t-rojo', sinTerm+' consignante(s) sin aceptar términos', "irA('consignantes')"]);
   $('#panelAlertas').innerHTML = alertas.length ? alertas.map(([c,t,p])=>
     `<div class="row" style="padding:8px 0;border-bottom:1px solid var(--surface-2)">
       <span class="tag ${c}">●</span><span style="flex:1;font-size:13px">${t}</span>
-      <button class="btn ghost sm" onclick="irA('${p}')">Ir</button></div>`).join('')
+      <button class="btn ghost sm" onclick="${p}">Ir</button></div>`).join('')
     : '<p class="sub">Todo en orden. No hay nada pendiente.</p>';
 
   const ult = L.slice().sort((a,b)=>(b.actualizado||b.creado||'').localeCompare(a.actualizado||a.creado||'')).slice(0,7);
@@ -2275,9 +2283,20 @@ async function importarVentasPOS(avisar){
       n++;
     }
   }catch(e){ if (avisar) toast('No se pudo leer el POS: ' + e.message,'err'); return 0; }
-  if (avisar){ pintarTodo(); toast(n ? `${n} venta(s) traídas del POS` : 'No hay ventas nuevas en el POS','ok'); }
+  if (avisar){ await revisarAltasPOS(); pintarTodo(); toast(n ? `${n} venta(s) traídas del POS` : 'No hay ventas nuevas en el POS','ok'); }
   else if (n) pintarTodo();
   return n;
+}
+
+/* Vigila que nadie dé de alta libros por el POS: Segunda Vida es la única puerta
+   de entrada, porque es la que deja contrato y aprobación de precio. */
+async function revisarAltasPOS(){
+  if (S.modo !== 'nube' || S.cfg.sincronizarPOS === false){ S.altasPOS = []; return 0; }
+  try{
+    const v = await leerConsignaPOS();
+    S.altasPOS = v.libros.filter(pl => !S.libros.some(x => x.posLibroId === pl.id || x.codigo === pl.code));
+  }catch(e){ S.altasPOS = []; }
+  return S.altasPOS.length;
 }
 
 /* --- Importación inicial de lo que ya vive en el POS --- */
@@ -2346,6 +2365,7 @@ async function importarDesdePOS(){
     }
     const g = await DB.guardar(COL.libros, l); S.libros.push(g); nl++;
   }
+  await revisarAltasPOS();
   pintarTodo();
   toast(`Importados ${nl} libro(s) y ${nc} consignante(s) del POS`, 'ok');
 }
