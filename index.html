@@ -468,6 +468,12 @@ tr:hover td{background:#FDFCFA}
       <label class="f"><span>Enlace público de aprobación <em>— URL donde publicas esta app</em></span><input type="text" id="cfgUrl" placeholder="https://mfge2009-ai.github.io/segunda-vida/"></label>
     </div>
   </div>
+  <div class="card">
+    <h3>Clave de Google Books <span class="tag t-gris">opcional</span></h3>
+    <p class="sub">Sin clave, Google Books limita las consultas y responde “saturado” a media jornada. Con una clave propia —gratuita— el límite sube muchísimo. Se crea en console.cloud.google.com → APIs y servicios → Credenciales → Crear credenciales → Clave de API, y conviene restringirla a “Books API”.</p>
+    <label class="f"><span>Clave de API</span><input type="text" id="cfgGoogleKey" class="mono" placeholder="AIza…" autocomplete="off"></label>
+    <p class="sub">Se guarda junto con el resto de los ajustes del programa y solo la usan los usuarios que entran a esta app.</p>
+  </div>
   <div class="row"><button class="btn" onclick="guardarAjustes()">Guardar ajustes</button>
     <button class="btn ghost" onclick="cargarDemo()">Cargar datos de ejemplo</button>
     <button class="btn ghost" onclick="respaldar()">Descargar respaldo JSON</button>
@@ -534,8 +540,9 @@ const CFG_DEF = {
     demanda:  { alta:1.10, media:1.00, baja:0.85 },
     antiguedad:{ reciente:1.05, media:1.00, antigua:0.95, muy_antigua:0.90 },
     edicion:  { especial:1.15, comun:1.00, bolsillo:0.92 },
-    rotacion: { rapida:1.05, normal:1.00, lenta:0.90 }
-  }
+    escasez:  { comun:0.95, normal:1.00, rara:1.15 }
+  },
+  googleKey:''
 };
 
 const ESTADOS_FISICOS = {
@@ -741,7 +748,11 @@ async function cargarTodo(){
     ]);
     S.cons = cons; S.libros = libros; S.aprob = aprob;
     S.cfg = Object.assign({}, CFG_DEF, cfgDoc || {});
-    S.cfg.factores = Object.assign({}, CFG_DEF.factores, (cfgDoc && cfgDoc.factores) || {});
+    // Solo se conservan los grupos de factores que la fórmula usa hoy.
+    S.cfg.factores = {};
+    Object.keys(CFG_DEF.factores).forEach(g => {
+      S.cfg.factores[g] = Object.assign({}, CFG_DEF.factores[g], (cfgDoc && cfgDoc.factores && cfgDoc.factores[g]) || {});
+    });
   }catch(e){
     S.cfg = Object.assign({}, CFG_DEF);
     toast('No se pudieron leer los datos: ' + e.message, 'err');
@@ -928,12 +939,13 @@ function llenarSelectCons(elId, conTodos){
 /* ============================ FÓRMULA DE PRECIO ============================ */
 function calcularPrecio(l){
   const f = S.cfg.factores;
+  if (!l.escasez) l = Object.assign({}, l, { escasez:'normal' });
   const base = Number(l.precioNuevoEst) || 0;
   const fe = f.estado[l.estadoFisico] != null ? f.estado[l.estadoFisico] : 0.5;
   const fd = f.demanda[l.demanda] != null ? f.demanda[l.demanda] : 1;
   const fa = f.antiguedad[l.antiguedad] != null ? f.antiguedad[l.antiguedad] : 1;
   const fi = f.edicion[l.edicion] != null ? f.edicion[l.edicion] : 1;
-  const fr = f.rotacion[l.rotacion] != null ? f.rotacion[l.rotacion] : 1;
+  const fr = f.escasez[l.escasez] != null ? f.escasez[l.escasez] : 1;
   const bruto = base * fe * fd * fa * fi * fr;
   let precio = redondear(bruto);
   const min = Number(S.cfg.precioMinimo)||0;
@@ -987,7 +999,9 @@ async function consultarISBN(isbn){
 
   if (!base && !web){
     return { datos:null, aviso: ext.limite
-      ? 'Los catálogos web están saturados en este momento y el libro no está en tu POS. Complétalo a mano.'
+      ? ((S.cfg.googleKey||'').trim()
+          ? 'Google Books respondió saturado y el libro no está en tu POS. Complétalo a mano.'
+          : 'Google Books está saturado (consultas sin clave). Puedes pegar una clave gratuita en Ajustes. Mientras tanto, complétalo a mano.')
       : 'Este ISBN no está en tu POS ni en los catálogos web. Complétalo a mano.' };
   }
   if (base && !web) return { datos: base };
@@ -1037,12 +1051,16 @@ async function buscarEnPOS(isbn){
 }
 
 /* --- 3 y 4. catálogos web públicos --- */
+function claveGoogle(){ const k = (S.cfg && S.cfg.googleKey || '').trim(); return k ? '&key=' + encodeURIComponent(k) : ''; }
+
 async function buscarEnCatalogosWeb(isbn){
+  let saturado = false;
   // Google Books, con un reintento si responde saturado (429)
   for (let intento = 0; intento < 2; intento++){
     try{
-      const r = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + encodeURIComponent(isbn));
-      if (r.status === 429){ await new Promise(x=>setTimeout(x, 900)); continue; }
+      const r = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + encodeURIComponent(isbn) + claveGoogle());
+      if (r.status === 429 || r.status === 403){ saturado = true; await new Promise(x=>setTimeout(x, 900)); continue; }
+      saturado = false;
       const j = await r.json();
       if (j.totalItems > 0){
         const v = j.items[0].volumeInfo || {};
@@ -1084,7 +1102,26 @@ async function buscarEnCatalogosWeb(isbn){
       }};
     }
   }catch(e){}
-  return { datos:null, limite:true };
+  // Open Library, segunda vía: su buscador general
+  try{
+    const r = await fetch('https://openlibrary.org/search.json?isbn=' + encodeURIComponent(isbn) + '&limit=1');
+    const j = await r.json();
+    const d = j.docs && j.docs[0];
+    if (d){
+      return { datos: {
+        isbn,
+        titulo: d.title || '',
+        autor: (d.author_name||[]).join(', '),
+        editorial: (d.publisher||[])[0] || '',
+        anio: d.first_publish_year ? String(d.first_publish_year) : '',
+        categoria: mapearCategoria((d.subject||[]).slice(0,25).join(' ')),
+        descripcion: '',
+        portadaUrl: d.cover_i ? ('https://covers.openlibrary.org/b/id/' + d.cover_i + '-M.jpg') : '',
+        fuente:'Open Library'
+      }};
+    }
+  }catch(e){}
+  return { datos:null, limite:saturado };
 }
 
 /* Los nombres del POS vienen en mayúsculas y recortados a 40 caracteres */
@@ -1104,8 +1141,8 @@ async function buscarPorTitulo(){
   toast('Buscando por título…');
   try{
     const q = 'intitle:' + encodeURIComponent(tit) + (aut ? '+inauthor:' + encodeURIComponent(aut) : '');
-    const r = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=1');
-    if (r.status === 429) return toast('Google Books está saturado. Intenta en un momento.','err');
+    const r = await fetch('https://www.googleapis.com/books/v1/volumes?q=' + q + '&maxResults=1' + claveGoogle());
+    if (r.status === 429 || r.status === 403) return toast((S.cfg.googleKey||'').trim() ? 'Google Books respondió saturado. Intenta en un momento.' : 'Google Books saturado. Pega una clave gratuita en Ajustes para evitarlo.','err');
     const j = await r.json();
     if (!j.totalItems) return toast('No se encontró ese título','err');
     const v = j.items[0].volumeInfo || {};
@@ -1177,8 +1214,9 @@ let FOTOS_TMP = [];
 
 function abrirLibro(id, esNuevo, pre){
   const l = id ? Object.assign({}, libroPorId(id)) : Object.assign({
-    estadoFisico:'bueno', aceptado:true, danios:[], fotos:[], edicion:'comun', rotacion:'normal'
+    estadoFisico:'bueno', aceptado:true, danios:[], fotos:[], edicion:'comun', escasez:'normal'
   }, pre||{});
+  if (!l.escasez) l.escasez = 'normal';
   if (!l.demanda) l.demanda = DEMANDA_POR_CAT[l.categoria] || 'media';
   if (!l.antiguedad) l.antiguedad = antiguedadPorAnio(l.anio);
   FOTOS_TMP = (l.fotos||[]).slice();
@@ -1238,7 +1276,7 @@ function abrirLibro(id, esNuevo, pre){
       <label class="f"><span>Demanda del género</span><div class="pill-group">${pillas('lDem',{alta:'Alta',media:'Media',baja:'Baja'}, l.demanda)}</div></label>
       <label class="f"><span>Antigüedad</span><div class="pill-group">${pillas('lAnt',{reciente:'Reciente',media:'3 a 10 años',antigua:'11 a 20 años',muy_antigua:'Más de 20'}, l.antiguedad)}</div></label>
       <label class="f"><span>Edición</span><div class="pill-group">${pillas('lEdi',{especial:'Especial o tapa dura',comun:'Común',bolsillo:'Bolsillo'}, l.edicion)}</div></label>
-      <label class="f"><span>Rotación esperada</span><div class="pill-group">${pillas('lRot',{rapida:'Rápida',normal:'Normal',lenta:'Lenta'}, l.rotacion)}</div></label>
+      <label class="f"><span>Disponibilidad <em>— ¿se consigue nuevo con facilidad?</em></span><div class="pill-group">${pillas('lEsc',{comun:'Se consigue fácil',normal:'Normal',rara:'Descatalogado o raro'}, l.escasez)}</div></label>
     </div>
     <div class="price-panel" id="pricePanel"></div>
     <label class="f" style="margin-top:12px"><span>Precio final de venta <em>— puedes ajustarlo antes de enviarlo a aprobación</em></span>
@@ -1270,7 +1308,7 @@ function recalc(){
   const tmp = {
     precioNuevoEst: parseFloat($('#lBase').value)||0,
     estadoFisico: radio('lEst'), demanda: radio('lDem'),
-    antiguedad: radio('lAnt'), edicion: radio('lEdi'), rotacion: radio('lRot')
+    antiguedad: radio('lAnt'), edicion: radio('lEdi'), escasez: radio('lEsc')
   };
   const r = calcularPrecio(tmp);
   const minCons = parseFloat($('#lMin').value)||0;
@@ -1288,7 +1326,7 @@ function recalc(){
       <div class="calc-line"><span>Demanda del género</span><b>× ${r.fd.toFixed(2)}</b></div>
       <div class="calc-line"><span>Antigüedad</span><b>× ${r.fa.toFixed(2)}</b></div>
       <div class="calc-line"><span>Edición</span><b>× ${r.fi.toFixed(2)}</b></div>
-      <div class="calc-line"><span>Rotación esperada</span><b>× ${r.fr.toFixed(2)}</b></div>
+      <div class="calc-line"><span>Disponibilidad · ${({comun:'se consigue fácil',normal:'normal',rara:'descatalogado o raro'})[tmp.escasez]||'—'}</span><b>× ${r.fr.toFixed(2)}</b></div>
       <div class="calc-line"><span>Resultado antes de redondear</span><b>${money(r.bruto)}</b></div>
     </div>
     ${r.ajustadoAlMinimo?`<div class="note warn" style="margin:10px 0 0">Se subió al precio mínimo de venta de la librería (${money(S.cfg.precioMinimo)}).</div>`:''}
@@ -1346,7 +1384,7 @@ async function guardarLibro(id, consId, orig){
   l.anio = $('#lAnio').value.trim(); l.categoria = $('#lCat').value;
   l.descripcion = $('#lDesc').value.trim(); l.portadaUrl = $('#lPort').value.trim();
   l.estadoFisico = radio('lEst'); l.demanda = radio('lDem'); l.antiguedad = radio('lAnt');
-  l.edicion = radio('lEdi'); l.rotacion = radio('lRot');
+  l.edicion = radio('lEdi'); l.escasez = radio('lEsc');
   l.danios = $$('#lDanios input:checked').map(x=>x.value);
   l.observaciones = $('#lObs').value.trim();
   l.fotos = FOTOS_TMP.slice();
@@ -2006,15 +2044,20 @@ function pintarAjustes(){
   $('#cfgMin').value = c.precioMinimo; $('#cfgRedondeo').value = String(c.redondeo);
   $('#cfgNombre').value = c.nombre; $('#cfgRuc').value = c.ruc; $('#cfgRep').value = c.representante;
   $('#cfgCiudad').value = c.ciudad; $('#cfgDir').value = c.direccion; $('#cfgUrl').value = c.urlPublica||'';
-  const et = { estado:'Estado físico', demanda:'Demanda del género', antiguedad:'Antigüedad', edicion:'Edición', rotacion:'Rotación esperada' };
-  const nom = { nuevo:'Nuevo', muy_bueno:'Muy bueno', bueno:'Bueno', aceptable:'Aceptable', alta:'Alta', media:'Media', baja:'Baja',
-    reciente:'Reciente (≤2 años)', antigua:'11 a 20 años', muy_antigua:'Más de 20 años', especial:'Especial / tapa dura', comun:'Común', bolsillo:'Bolsillo',
-    rapida:'Rápida', normal:'Normal', lenta:'Lenta' };
+  const et = { estado:'Estado físico', demanda:'Demanda del género', antiguedad:'Antigüedad', edicion:'Edición', escasez:'Disponibilidad' };
+  const nom = {
+    estado:{ nuevo:'Nuevo', muy_bueno:'Muy bueno', bueno:'Bueno', aceptable:'Aceptable' },
+    demanda:{ alta:'Alta', media:'Media', baja:'Baja' },
+    antiguedad:{ reciente:'Reciente (≤2 años)', media:'3 a 10 años', antigua:'11 a 20 años', muy_antigua:'Más de 20 años' },
+    edicion:{ especial:'Especial / tapa dura', comun:'Común', bolsillo:'Bolsillo' },
+    escasez:{ comun:'Se consigue fácil', normal:'Normal', rara:'Descatalogado o raro' }
+  };
   $('#cfgFactores').innerHTML = Object.entries(c.factores).map(([grupo,vals])=>`
     <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin:12px 0 8px">${et[grupo]||grupo}</h4>
     <div class="grid g4">${Object.entries(vals).map(([k,v])=>
-      `<label class="f"><span>${nom[k]|| (grupo==='antiguedad'&&k==='media'?'3 a 10 años':k)}</span>
+      `<label class="f"><span>${(nom[grupo]&&nom[grupo][k])||k}</span>
         <input type="number" step="0.01" min="0" data-f="${grupo}" data-k="${k}" value="${v}"></label>`).join('')}</div>`).join('');
+  $('#cfgGoogleKey').value = c.googleKey || '';
   $('#estadoConn').innerHTML = S.modo === 'local'
     ? 'Modo local: los datos viven solo en este navegador. Para trabajar entre computadora y celular y para que el consignante apruebe por enlace, conecta Firebase.'
     : `Conectado a Firebase · proyecto <b class="mono">${esc((leerCfgGuardada()||FIREBASE_CONFIG_FIJA||{}).projectId||'—')}</b> · usuario <b>${esc(S.user?S.user.email:'')}</b> · rol <b>${esc(S.rol||'sin rol asignado')}</b><br>Colecciones: <span class="mono">${Object.values(COL).join(' · ')}</span>`;
@@ -2032,6 +2075,7 @@ async function guardarAjustes(){
   c.nombre = $('#cfgNombre').value.trim(); c.ruc = $('#cfgRuc').value.trim();
   c.representante = $('#cfgRep').value.trim(); c.ciudad = $('#cfgCiudad').value.trim();
   c.direccion = $('#cfgDir').value.trim(); c.urlPublica = $('#cfgUrl').value.trim();
+  c.googleKey = $('#cfgGoogleKey').value.trim();
   $$('#cfgFactores input').forEach(i => { c.factores[i.dataset.f][i.dataset.k] = parseFloat(i.value)||0; });
   c.id = 'general';
   await DB.guardar(COL.cfg, c);
@@ -2369,18 +2413,19 @@ async function cargarDemo(){
   const guardados = [];
   for (const c of demoCons){ c.codigo = await DB.siguienteCodigo('cons'); const s = await DB.guardar(COL.cons, c); S.cons.push(s); guardados.push(s); }
   const demoLibros = [
-    { titulo:'Cien años de soledad', autor:'Gabriel García Márquez', editorial:'Sudamericana', anio:'1967', categoria:'Clásicos', isbn:'9788437604947', estadoFisico:'bueno', precioNuevoEst:22, edicion:'comun', rotacion:'normal' },
-    { titulo:'Alas de sangre', autor:'Rebecca Yarros', editorial:'Planeta', anio:'2023', categoria:'Fantasía', isbn:'9788408277507', estadoFisico:'muy_bueno', precioNuevoEst:28, edicion:'especial', rotacion:'rapida' },
-    { titulo:'La casa de los espíritus', autor:'Isabel Allende', editorial:'Plaza & Janés', anio:'1982', categoria:'Literatura', isbn:'9788401337208', estadoFisico:'aceptable', precioNuevoEst:19, edicion:'bolsillo', rotacion:'normal' },
-    { titulo:'Chainsaw Man vol. 1', autor:'Tatsuki Fujimoto', editorial:'Norma', anio:'2021', categoria:'Manga y cómic', isbn:'9788467941975', estadoFisico:'nuevo', precioNuevoEst:12, edicion:'comun', rotacion:'rapida' },
-    { titulo:'El principito', autor:'Antoine de Saint-Exupéry', editorial:'Salamandra', anio:'2016', categoria:'Infantil', isbn:'9788498381498', estadoFisico:'bueno', precioNuevoEst:14, edicion:'comun', rotacion:'rapida' },
-    { titulo:'Sapiens', autor:'Yuval Noah Harari', editorial:'Debate', anio:'2014', categoria:'No ficción', isbn:'9788499926223', estadoFisico:'muy_bueno', precioNuevoEst:26, edicion:'comun', rotacion:'normal' }
+    { titulo:'Cien años de soledad', autor:'Gabriel García Márquez', editorial:'Sudamericana', anio:'1967', categoria:'Clásicos', isbn:'9788437604947', estadoFisico:'bueno', precioNuevoEst:22, edicion:'comun', escasez:'normal' },
+    { titulo:'Alas de sangre', autor:'Rebecca Yarros', editorial:'Planeta', anio:'2023', categoria:'Fantasía', isbn:'9788408277507', estadoFisico:'muy_bueno', precioNuevoEst:28, edicion:'especial', escasez:'comun' },
+    { titulo:'La casa de los espíritus', autor:'Isabel Allende', editorial:'Plaza & Janés', anio:'1982', categoria:'Literatura', isbn:'9788401337208', estadoFisico:'aceptable', precioNuevoEst:19, edicion:'bolsillo', escasez:'normal' },
+    { titulo:'Chainsaw Man vol. 1', autor:'Tatsuki Fujimoto', editorial:'Norma', anio:'2021', categoria:'Manga y cómic', isbn:'9788467941975', estadoFisico:'nuevo', precioNuevoEst:12, edicion:'comun', escasez:'comun' },
+    { titulo:'El principito', autor:'Antoine de Saint-Exupéry', editorial:'Salamandra', anio:'2016', categoria:'Infantil', isbn:'9788498381498', estadoFisico:'bueno', precioNuevoEst:14, edicion:'comun', escasez:'comun' },
+    { titulo:'Sapiens', autor:'Yuval Noah Harari', editorial:'Debate', anio:'2014', categoria:'No ficción', isbn:'9788499926223', estadoFisico:'muy_bueno', precioNuevoEst:26, edicion:'comun', escasez:'normal' }
   ];
   for (let i=0;i<demoLibros.length;i++){
     const l = demoLibros[i];
     const c = guardados[i % guardados.length];
     l.consignanteId = c.id; l.consignanteNombre = nombreCons(c);
     l.demanda = DEMANDA_POR_CAT[l.categoria] || 'media';
+    if (!l.escasez) l.escasez = 'normal';
     l.antiguedad = antiguedadPorAnio(l.anio);
     l.aceptado = true; l.danios = []; l.fotos = [];
     l.codigo = await DB.siguienteCodigo('libros');
