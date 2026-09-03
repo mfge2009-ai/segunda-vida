@@ -1293,7 +1293,7 @@ function abrirLibro(id, esNuevo, pre){
     </div>
     <div class="price-panel" id="pricePanel"></div>
     <label class="f" style="margin-top:12px"><span>Precio final de venta <em>— puedes ajustarlo antes de enviarlo a aprobación</em></span>
-      <input type="number" id="lFinal" step="0.25" min="0" value="${l.precioFinal||''}" oninput="verSplit()"></label>
+      <input type="number" id="lFinal" step="0.25" min="0" value="${l.precioFinal||''}" oninput="this.dataset.tocado='1';verSplit()"></label>
     <div id="splitBox"></div>
   `, [
     {t:'Cancelar', c:'ghost', f:()=>{cerrarModal();}},
@@ -1301,8 +1301,10 @@ function abrirLibro(id, esNuevo, pre){
     {t: id?'Guardar cambios':'Guardar y seguir escaneando', f:()=>guardarLibro(id, consId, l)}
   ].filter(Boolean));
 
-  pintarThumbs(); verPortada(); recalc();
-  if (l.precioFinal) $('#lFinal').value = l.precioFinal;
+  pintarThumbs(); verPortada();
+  // Un libro ya guardado conserva el precio que se le puso; uno nuevo sigue al sugerido.
+  if (id && l.precioFinal){ const f = $('#lFinal'); f.value = l.precioFinal; f.dataset.tocado = '1'; }
+  recalc();
   // ingreso rápido: si no hay título todavía, el cursor arranca ahí
   if (!id && !l.titulo) setTimeout(()=>{ const t=$('#lTit'); if(t) t.focus(); }, 120);
   else if (!id && !l.precioNuevoEst) setTimeout(()=>{ const t=$('#lBase'); if(t) t.focus(); }, 120);
@@ -1331,7 +1333,7 @@ function recalc(){
       <div><div class="l" style="font-size:11px;color:var(--ink-3);font-weight:650;text-transform:uppercase;letter-spacing:.04em">Precio sugerido</div>
         <div class="price-big">${money(r.precio)}</div></div>
       <div class="spacer" style="flex:1"></div>
-      <button type="button" class="btn ghost sm" onclick="$('#lFinal').value=${r.precio.toFixed(2)};verSplit()">Usar este precio</button>
+      <button type="button" class="btn ghost sm" onclick="const f=$('#lFinal');f.value='${r.precio.toFixed(2)}';f.dataset.tocado='';verSplit()">Volver al sugerido</button>
     </div>
     <div style="margin-top:12px">
       <div class="calc-line"><span>Precio de referencia</span><b>${money(r.base)}</b></div>
@@ -1345,7 +1347,10 @@ function recalc(){
     ${r.ajustadoAlMinimo?`<div class="note warn" style="margin:10px 0 0">Se subió al precio mínimo de venta de la librería (${money(S.cfg.precioMinimo)}).</div>`:''}
     ${alerta?`<div class="note bad" style="margin:10px 0 0">El sugerido queda por debajo del mínimo que pide el consignante (${money(minCons)}). Conversa el precio antes de enviarlo.</div>`:''}
   `;
-  if (!$('#lFinal').value) $('#lFinal').value = r.precio.toFixed(2);
+  // Mientras nadie escriba un precio a mano, el final sigue al sugerido:
+  // así, si cambias el estado físico o la categoría, el precio se actualiza solo.
+  const fin = $('#lFinal');
+  if (fin && (!fin.value || fin.dataset.tocado !== '1')) fin.value = r.precio.toFixed(2);
   verSplit();
 }
 
