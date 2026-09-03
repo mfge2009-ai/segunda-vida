@@ -2282,8 +2282,23 @@ async function importarVentasPOS(avisar){
       S.libros[S.libros.findIndex(x=>x.id===g.id)] = g;
       n++;
     }
+    // Si el POS anula una venta, el libro vuelve a estar disponible allá:
+    // aquí se revierte para que no quede un cobro fantasma en la liquidación.
+    for (const l of S.libros){
+      if (l.estado !== 'vendido' || !l.venta || l.venta.origen !== 'POS') continue;
+      const pl = v.libros.find(x => x.id === l.posLibroId || x.code === l.codigo);
+      if (!pl || pl.estado === 'vendido') continue;
+      const o = Object.assign({}, l);
+      o.estado = 'publicado';
+      o.ventaAnulada = Object.assign({}, o.venta, { anuladaEl:new Date().toISOString() });
+      delete o.venta;
+      o.historial = (o.historial||[]).concat([{ f:new Date().toISOString(), e:'publicado', u:'POS · venta anulada' }]);
+      const g = await DB.guardar(COL.libros, o);
+      S.libros[S.libros.findIndex(x=>x.id===g.id)] = g;
+      n++;
+    }
   }catch(e){ if (avisar) toast('No se pudo leer el POS: ' + e.message,'err'); return 0; }
-  if (avisar){ await revisarAltasPOS(); pintarTodo(); toast(n ? `${n} venta(s) traídas del POS` : 'No hay ventas nuevas en el POS','ok'); }
+  if (avisar){ await revisarAltasPOS(); pintarTodo(); toast(n ? `${n} movimiento(s) sincronizados con el POS` : 'No hay ventas nuevas en el POS','ok'); }
   else if (n) pintarTodo();
   return n;
 }
