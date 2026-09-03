@@ -474,6 +474,18 @@ tr:hover td{background:#FDFCFA}
     <label class="f"><span>Clave de API</span><input type="text" id="cfgGoogleKey" class="mono" placeholder="AIza…" autocomplete="off"></label>
     <p class="sub">Se guarda junto con el resto de los ajustes del programa y solo la usan los usuarios que entran a esta app.</p>
   </div>
+  <div class="card">
+    <h3>Conexión con el POS</h3>
+    <p class="sub">El POS ya tiene su módulo de consignación “Tu libro tiene otra vida”. Segunda Vida escribe ahí los libros aprobados para que se vendan escaneando, y trae de vuelta las ventas para calcular el reparto. El archivo del POS no se modifica.</p>
+    <label class="check"><input type="checkbox" id="cfgPOS">
+      <span><b>Mantener el POS sincronizado.</b> Al marcar un libro como publicado se envía al POS, y al abrir la app se traen las ventas registradas allí.</span></label>
+    <div class="row">
+      <button class="btn ghost" onclick="importarVentasPOS(true)">Traer ventas del POS ahora</button>
+      <button class="btn ghost" onclick="importarDesdePOS()">Importar la consignación que ya está en el POS</button>
+      <button class="btn ghost" onclick="verEstadoPOS()">Ver qué hay en el POS</button>
+    </div>
+    <p class="sub" style="margin-top:10px">Para escribir en el POS hace falta rol <b>admin</b> o <b>pos</b>. Un usuario con rol <b>consig</b> puede usar toda la app, pero no sincronizar.</p>
+  </div>
   <div class="row"><button class="btn" onclick="guardarAjustes()">Guardar ajustes</button>
     <button class="btn ghost" onclick="cargarDemo()">Cargar datos de ejemplo</button>
     <button class="btn ghost" onclick="respaldar()">Descargar respaldo JSON</button>
@@ -531,7 +543,7 @@ const S = {
 /* ---------------- configuración por defecto ---------------- */
 const CFG_DEF = {
   pctConsignante:70, pctLibreria:30, plazoDias:120, diasRetiro:15,
-  precioMinimo:3, redondeo:0.5,
+  precioMinimo:3, redondeo:0.5, sincronizarPOS:true,
   nombre:'LA MADRIGUERA — CAFÉ Y LIBROS', ruc:'', representante:'',
   ciudad:'Guayaquil', direccion:'Urdesa Central, Guayaquil',
   urlPublica:'',
@@ -759,6 +771,7 @@ async function cargarTodo(){
   }
   recalcularVencidos(false);
   await sincronizarAprobaciones();
+  if (S.modo === 'nube' && S.cfg.sincronizarPOS !== false) await importarVentasPOS(false);
 }
 
 function construirNav(){
@@ -1515,8 +1528,11 @@ async function accionMasiva(accion){
     if (accion === 'publicado' && l.estado !== 'aprobado'){ continue; }
     await cambiarEstado(id, accion, true); n++;
   }
+  if (accion === 'publicado' && n && S.cfg.sincronizarPOS !== false){
+    await publicarEnPOS(ids.filter(x => libroPorId(x) && libroPorId(x).estado === 'publicado'), true);
+  }
   pintarTodo();
-  toast(n ? `${n} libro(s) actualizados` : 'Solo se publican libros con el precio aprobado', n?'ok':'err');
+  toast(n ? `${n} libro(s) actualizados${accion==='publicado' && S.cfg.sincronizarPOS!==false ? ' y enviados al POS' : ''}` : 'Solo se publican libros con el precio aprobado', n?'ok':'err');
 }
 
 function menuEstado(id){
@@ -1543,6 +1559,7 @@ async function cambiarEstado(id, nuevo, silencioso){
   l.historial = (l.historial||[]).concat([{ f:new Date().toISOString(), e:nuevo, u:(S.user?S.user.email:'local') }]);
   const saved = await DB.guardar(COL.libros, l);
   S.libros[S.libros.findIndex(x=>x.id===id)] = saved;
+  if (nuevo === 'publicado' && S.cfg.sincronizarPOS !== false) await publicarEnPOS([id], true);
   if (!silencioso){ cerrarModal(); pintarTodo(); toast('Situación actualizada','ok'); }
 }
 
@@ -2058,6 +2075,7 @@ function pintarAjustes(){
       `<label class="f"><span>${(nom[grupo]&&nom[grupo][k])||k}</span>
         <input type="number" step="0.01" min="0" data-f="${grupo}" data-k="${k}" value="${v}"></label>`).join('')}</div>`).join('');
   $('#cfgGoogleKey').value = c.googleKey || '';
+  $('#cfgPOS').checked = c.sincronizarPOS !== false;
   $('#estadoConn').innerHTML = S.modo === 'local'
     ? 'Modo local: los datos viven solo en este navegador. Para trabajar entre computadora y celular y para que el consignante apruebe por enlace, conecta Firebase.'
     : `Conectado a Firebase · proyecto <b class="mono">${esc((leerCfgGuardada()||FIREBASE_CONFIG_FIJA||{}).projectId||'—')}</b> · usuario <b>${esc(S.user?S.user.email:'')}</b> · rol <b>${esc(S.rol||'sin rol asignado')}</b><br>Colecciones: <span class="mono">${Object.values(COL).join(' · ')}</span>`;
@@ -2076,6 +2094,7 @@ async function guardarAjustes(){
   c.representante = $('#cfgRep').value.trim(); c.ciudad = $('#cfgCiudad').value.trim();
   c.direccion = $('#cfgDir').value.trim(); c.urlPublica = $('#cfgUrl').value.trim();
   c.googleKey = $('#cfgGoogleKey').value.trim();
+  c.sincronizarPOS = $('#cfgPOS').checked;
   $$('#cfgFactores input').forEach(i => { c.factores[i.dataset.f][i.dataset.k] = parseFloat(i.value)||0; });
   c.id = 'general';
   await DB.guardar(COL.cfg, c);
@@ -2086,6 +2105,33 @@ function respaldar(){
   const data = { generado:new Date().toISOString(), cfg:S.cfg, consignantes:S.cons, libros:S.libros, aprobaciones:S.aprob };
   bajarArchivo('respaldo-segunda-vida-' + hoyISO() + '.json', JSON.stringify(data,null,2), 'application/json');
   toast('Respaldo descargado','ok');
+}
+
+async function verEstadoPOS(){
+  if (S.modo !== 'nube') return toast('Disponible solo con la app conectada a la nube','err');
+  let v;
+  try{ v = await leerConsignaPOS(); }catch(e){ return toast('No se pudo leer el POS: ' + e.message,'err'); }
+  const disp = v.libros.filter(l=>l.estado==='disponible'), vend = v.libros.filter(l=>l.estado==='vendido');
+  const enSV = v.libros.filter(pl => S.libros.some(x => x.posLibroId === pl.id || x.codigo === pl.code)).length;
+  modal('Módulo de consignación del POS', `
+    <div class="grid g4" style="margin-bottom:14px">
+      <div class="kpi"><div class="n">${v.libros.length}</div><div class="l">Libros en el POS</div></div>
+      <div class="kpi v"><div class="n">${disp.length}</div><div class="l">Disponibles</div></div>
+      <div class="kpi t"><div class="n">${vend.length}</div><div class="l">Vendidos</div></div>
+      <div class="kpi"><div class="n">${enSV} de ${v.libros.length}</div><div class="l">Ya en Segunda Vida</div></div>
+    </div>
+    <div class="tw"><table><thead><tr><th>Código</th><th>Título</th><th>Consignante</th><th>Precio</th><th>Estado</th><th>En Segunda Vida</th></tr></thead><tbody>
+      ${v.libros.slice(0,60).map(pl=>{
+        const pc = v.consignantes.find(c=>c.id===pl.consignanteId) || {};
+        const enlazado = S.libros.some(x => x.posLibroId === pl.id || x.codigo === pl.code);
+        return `<tr><td class="mono">${esc(pl.code||'')}</td><td>${esc(pl.titulo||'')}</td><td>${esc(pc.nombre||'')}</td>
+          <td>${money(pl.precio)}</td><td><span class="tag ${pl.estado==='vendido'?'t-terra':'t-verde'}">${esc(pl.estado||'')}</span></td>
+          <td>${enlazado?'<span class="tag t-verde">Sí</span>':'<span class="tag t-gris">No</span>'}</td></tr>`;
+      }).join('')}
+    </tbody></table></div>
+    ${v.libros.length>60?`<p class="sub" style="margin-top:8px">Mostrando 60 de ${v.libros.length}.</p>`:''}
+  `, [{t:'Cerrar', c:'ghost', f:cerrarModal},
+      {t:'Importar los que faltan', f:async()=>{ cerrarModal(); await importarDesdePOS(); }}]);
 }
 
 /* ============================ MODAL ============================ */
@@ -2120,6 +2166,184 @@ function modal(titulo, cuerpo, botones){
 }
 function cerrarModal(){ $('#modales').innerHTML = ''; document.body.style.overflow = ''; }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+
+
+/* ====================== CONEXIÓN CON EL POS ======================
+   El POS de La Madriguera ya trae su propio módulo de consignación, guardado
+   en el documento madu/consigna con la forma:
+       v = { consignantes:[{id:'cn…',nombre,cedula,…}],
+             libros:[{id:'lb…',code,titulo,autor,consignanteId,precio,
+                      estado:'disponible'|'vendido',fechaIngreso,fechaVence,
+                      fechaVenta,precioVendido,ventaId}],
+             liquidaciones:[] }
+   Segunda Vida escribe ahí los libros aprobados para que se vendan escaneando,
+   y lee de vuelta los que el POS marcó vendidos. El archivo del POS no se toca.
+   Requiere rol admin o pos (las reglas de madu/ piden esPOS()).            */
+
+function refConsignaPOS(){ return S.db.collection('madu').doc('consigna'); }
+
+async function leerConsignaPOS(){
+  const d = await refConsignaPOS().get();
+  const v = (d.exists && d.data().v) || {};
+  return { consignantes: v.consignantes || [], libros: v.libros || [], liquidaciones: v.liquidaciones || [] };
+}
+
+function idPOS(pre){ return pre + Date.now() + Math.random().toString(36).slice(2,5); }
+function aISO(fecha){ if(!fecha) return new Date().toISOString(); return String(fecha).length <= 10 ? new Date(fecha + 'T12:00:00').toISOString() : new Date(fecha).toISOString(); }
+
+/* --- Segunda Vida  →  POS --- */
+async function publicarEnPOS(ids, silencioso){
+  if (S.modo !== 'nube') { if(!silencioso) toast('La conexión con el POS necesita la app en la nube','err'); return 0; }
+  const libros = ids.map(libroPorId).filter(l => l && l.aceptado !== false);
+  if (!libros.length) return 0;
+  const mapa = [];
+  try{
+    await S.db.runTransaction(async tx => {
+      const ref = refConsignaPOS();
+      const doc = await tx.get(ref);
+      const v = (doc.exists && doc.data().v) || { consignantes:[], libros:[], liquidaciones:[] };
+      v.consignantes = v.consignantes || []; v.libros = v.libros || []; v.liquidaciones = v.liquidaciones || [];
+      mapa.length = 0;
+      for (const l of libros){
+        const c = consPorId(l.consignanteId); if (!c) continue;
+        let pc = (c.posId && v.consignantes.find(x => x.id === c.posId))
+              || (c.cedula && v.consignantes.find(x => x.cedula === c.cedula));
+        if (!pc){
+          pc = { id: idPOS('cn'), nombre: nombreCons(c).toUpperCase(), cedula:c.cedula||'', telefono:c.telefono||'',
+                 email:c.email||'', formaPago:c.formaPago||'', notas:'Segunda Vida', fecha:new Date().toISOString() };
+          v.consignantes.push(pc);
+        }
+        let pl = v.libros.find(x => x.code === l.codigo) || (l.posLibroId && v.libros.find(x => x.id === l.posLibroId));
+        if (pl){
+          pl.precio = Number(l.precioFinal) || pl.precio;
+          pl.titulo = l.titulo; pl.autor = l.autor || '';
+          pl.consignanteId = pc.id;
+        } else {
+          pl = { id: idPOS('lb'), code: l.codigo, titulo: l.titulo, autor: l.autor || '',
+                 consignanteId: pc.id, precio: Number(l.precioFinal) || 0, estado:'disponible',
+                 fechaIngreso: aISO(l.fechaIngreso), fechaVence: aISO(l.fechaLimite) };
+          v.libros.push(pl);
+        }
+        mapa.push({ svLibro:l.id, svCons:c.id, posLibroId:pl.id, posConsId:pc.id });
+      }
+      tx.set(ref, { v }, { merge:true });
+    });
+  }catch(e){
+    if (!silencioso) toast('No se pudo escribir en el POS: ' + e.message + (String(e.message).includes('permission') ? ' (se necesita rol admin o pos)' : ''), 'err');
+    return 0;
+  }
+  // se anotan las referencias del lado de Segunda Vida
+  for (const m of mapa){
+    const l = Object.assign({}, libroPorId(m.svLibro));
+    l.posLibroId = m.posLibroId; l.sincronizadoPOS = new Date().toISOString();
+    const g = await DB.guardar(COL.libros, l); S.libros[S.libros.findIndex(x=>x.id===g.id)] = g;
+    const c = consPorId(m.svCons);
+    if (c && c.posId !== m.posConsId){
+      const cc = Object.assign({}, c, { posId:m.posConsId });
+      const gc = await DB.guardar(COL.cons, cc); S.cons[S.cons.findIndex(x=>x.id===gc.id)] = gc;
+    }
+  }
+  if (!silencioso) toast(`${mapa.length} libro(s) enviados al POS`, 'ok');
+  return mapa.length;
+}
+
+/* --- POS  →  Segunda Vida: ventas --- */
+async function importarVentasPOS(avisar){
+  if (S.modo !== 'nube') { if (avisar) toast('Disponible solo con la app conectada a la nube','err'); return 0; }
+  let n = 0;
+  try{
+    const v = await leerConsignaPOS();
+    for (const pl of v.libros){
+      if (pl.estado !== 'vendido') continue;
+      const l = S.libros.find(x => x.posLibroId === pl.id || (x.codigo && x.codigo === pl.code));
+      if (!l || ['vendido','pagado','retirado'].includes(l.estado)) continue;
+      const precio = Number(pl.precioVendido != null ? pl.precioVendido : pl.precio) || 0;
+      const o = Object.assign({}, l);
+      o.venta = { fecha: String(pl.fechaVenta || new Date().toISOString()).slice(0,10), precioVenta: precio,
+        montoConsignante: Math.round(precio * S.cfg.pctConsignante) / 100,
+        montoLibreria: Math.round(precio * S.cfg.pctLibreria) / 100,
+        metodoPago:'Registrada en el POS', ventaId: pl.ventaId || '', origen:'POS' };
+      o.estado = 'vendido';
+      o.historial = (o.historial||[]).concat([{ f:new Date().toISOString(), e:'vendido', u:'POS' }]);
+      const g = await DB.guardar(COL.libros, o);
+      S.libros[S.libros.findIndex(x=>x.id===g.id)] = g;
+      n++;
+    }
+  }catch(e){ if (avisar) toast('No se pudo leer el POS: ' + e.message,'err'); return 0; }
+  if (avisar){ pintarTodo(); toast(n ? `${n} venta(s) traídas del POS` : 'No hay ventas nuevas en el POS','ok'); }
+  else if (n) pintarTodo();
+  return n;
+}
+
+/* --- Importación inicial de lo que ya vive en el POS --- */
+function partirNombre(nombre){
+  const p = String(nombre||'').trim().split(/\s+/).filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+  if (p.length >= 4) return { nombres:p.slice(0,2).join(' '), apellidos:p.slice(2).join(' ') };
+  if (p.length === 3) return { nombres:p[0], apellidos:p.slice(1).join(' ') };
+  if (p.length === 2) return { nombres:p[0], apellidos:p[1] };
+  return { nombres:p[0] || 'Sin nombre', apellidos:'' };
+}
+
+async function importarDesdePOS(){
+  if (S.modo !== 'nube') return toast('Disponible solo con la app conectada a la nube','err');
+  let v;
+  try{ v = await leerConsignaPOS(); }
+  catch(e){ return toast('No se pudo leer el POS: ' + e.message,'err'); }
+  const nuevosLibros = v.libros.filter(pl => !S.libros.some(x => x.posLibroId === pl.id || x.codigo === pl.code));
+  if (!nuevosLibros.length) return toast('No hay nada nuevo que importar del POS','ok');
+  if (!confirm(`Se importarán ${nuevosLibros.length} libro(s) del módulo de consignación del POS, con su consignante, precio y fechas. No se borra ni se modifica nada en el POS. ¿Continuar?`)) return;
+
+  const mapaCons = {};
+  let nc = 0, nl = 0;
+  for (const pc of v.consignantes){
+    let c = S.cons.find(x => x.posId === pc.id || (pc.cedula && x.cedula === pc.cedula));
+    if (!c){
+      const { nombres, apellidos } = partirNombre(pc.nombre);
+      c = { nombres, apellidos, cedula:pc.cedula||'', telefono:pc.telefono||'', email:pc.email||'',
+            formaPago: /transfer|cuenta/i.test(pc.formaPago||'') ? 'transferencia' : (/credito/i.test(pc.formaPago||'') ? 'credito' : 'efectivo'),
+            datosPago: pc.formaPago || '', notas: (pc.notas ? pc.notas + ' · ' : '') + 'Importado del POS',
+            aceptaTerminos:false, activo:true, creado: pc.fecha || new Date().toISOString(), posId: pc.id };
+      c.codigo = await DB.siguienteCodigo('cons');
+      const g = await DB.guardar(COL.cons, c); S.cons.push(g); c = g; nc++;
+    } else if (!c.posId){
+      const g = await DB.guardar(COL.cons, Object.assign({}, c, { posId:pc.id }));
+      S.cons[S.cons.findIndex(x=>x.id===g.id)] = g; c = g;
+    }
+    mapaCons[pc.id] = c;
+  }
+  for (const pl of nuevosLibros){
+    const c = mapaCons[pl.consignanteId];
+    if (!c) continue;
+    const precio = Number(pl.precio) || 0;
+    const l = {
+      codigo: pl.code || ('POS-' + String(pl.id).slice(-6)),
+      posLibroId: pl.id, origenPOS: true,
+      consignanteId: c.id, consignanteNombre: nombreCons(c),
+      isbn:'', titulo: pl.titulo || 'Sin título', autor: pl.autor || '', editorial:'', anio:'', categoria:'',
+      descripcion:'', portadaUrl:'', estadoFisico:'bueno', demanda:'media', antiguedad:'media',
+      edicion:'comun', escasez:'normal', danios:[], fotos:[], observaciones:'Importado del módulo de consignación del POS',
+      aceptado:true, precioNuevoEst:0, precioMinimoCons:0, precioSugerido:precio, precioFinal:precio,
+      fechaIngreso: String(pl.fechaIngreso || new Date().toISOString()).slice(0,10),
+      fechaLimite: String(pl.fechaVence || sumarDias(hoyISO(), S.cfg.plazoDias)).slice(0,10),
+      creado: pl.fechaIngreso || new Date().toISOString(),
+      historial: [{ f: pl.fechaIngreso || new Date().toISOString(), e:'publicado', u:'POS' }]
+    };
+    if (pl.estado === 'vendido'){
+      const pv = Number(pl.precioVendido != null ? pl.precioVendido : pl.precio) || 0;
+      l.estado = 'vendido';
+      l.venta = { fecha: String(pl.fechaVenta || '').slice(0,10), precioVenta: pv,
+        montoConsignante: Math.round(pv * S.cfg.pctConsignante) / 100,
+        montoLibreria: Math.round(pv * S.cfg.pctLibreria) / 100,
+        metodoPago:'Registrada en el POS', ventaId: pl.ventaId || '', origen:'POS' };
+      l.historial.push({ f: pl.fechaVenta || new Date().toISOString(), e:'vendido', u:'POS' });
+    } else {
+      l.estado = 'publicado';
+    }
+    const g = await DB.guardar(COL.libros, l); S.libros.push(g); nl++;
+  }
+  pintarTodo();
+  toast(`Importados ${nl} libro(s) y ${nc} consignante(s) del POS`, 'ok');
+}
 
 /* ============================ DOCUMENTOS ============================ */
 function librosDelContrato(consId){
