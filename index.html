@@ -832,8 +832,9 @@ function abrirConsignante(id){
     ${id?'':'<div class="note info">Al guardar se genera el código del consignante y queda listo para recibir libros.</div>'}
   `, [
     {t:'Cancelar', c:'ghost', f:cerrarModal},
+    id ? {t:'Eliminar', c:'danger', f:()=>eliminarConsignante(id)} : null,
     {t:'Guardar', f:()=>guardarConsignante(id)}
-  ]);
+  ].filter(Boolean));
 }
 
 async function guardarConsignante(id){
@@ -851,11 +852,27 @@ async function guardarConsignante(id){
   if (!c.telefono) return toast('El celular es obligatorio','err');
   const dup = S.cons.find(x => x.cedula && x.cedula === c.cedula && x.id !== id);
   if (dup) return toast('Ya existe un consignante con esa cédula: ' + nombreCons(dup),'err');
+  if (!id){
+    const mismoNombre = S.cons.find(x => nombreCons(x).toLowerCase() === nombreCons(c).toLowerCase());
+    if (mismoNombre && !confirm(`Ya hay un consignante llamado ${nombreCons(mismoNombre)} (${mismoNombre.codigo||''}). ¿Crear otro de todos modos?`)) return;
+  }
   if (!c.codigo) c.codigo = await DB.siguienteCodigo('cons');
   const saved = await DB.guardar(COL.cons, c);
   const i = S.cons.findIndex(x=>x.id===saved.id);
   if (i>=0) S.cons[i] = saved; else S.cons.push(saved);
   cerrarModal(); pintarTodo(); toast('Consignante guardado','ok');
+}
+
+async function eliminarConsignante(id){
+  const c = consPorId(id); if(!c) return;
+  const libros = S.libros.filter(l => l.consignanteId === id);
+  if (libros.length){
+    return toast(`No se puede eliminar: ${nombreCons(c)} tiene ${libros.length} libro(s) registrados.`, 'err');
+  }
+  if (!confirm(`¿Eliminar a ${nombreCons(c)} (${c.codigo||'sin código'})? No tiene libros registrados y la acción no se puede deshacer.`)) return;
+  await DB.borrar(COL.cons, id);
+  S.cons = S.cons.filter(x => x.id !== id);
+  cerrarModal(); pintarTodo(); toast('Consignante eliminado');
 }
 
 function verConsignante(id){
@@ -1933,7 +1950,22 @@ function modal(titulo, cuerpo, botones){
   const f = $('#modalFoot');
   (botones||[]).forEach((b,i)=>{
     const el = document.createElement('button');
-    el.className = 'btn ' + (b.c||''); el.textContent = b.t; el.onclick = b.f;
+    el.className = 'btn ' + (b.c||''); el.textContent = b.t;
+    // Un solo clic a la vez: evita que un doble clic guarde el registro dos veces.
+    el.onclick = async () => {
+      if (f.dataset.ocupado === '1') return;
+      f.dataset.ocupado = '1';
+      const btns = Array.from(f.querySelectorAll('button'));
+      const textoOriginal = el.textContent;
+      btns.forEach(x => x.disabled = true);
+      if (b.c !== 'ghost') el.textContent = 'Guardando…';
+      try { await b.f(); }
+      catch(e){ toast('No se pudo completar: ' + (e && e.message ? e.message : e), 'err'); }
+      finally {
+        f.dataset.ocupado = '0';
+        if (document.body.contains(el)){ btns.forEach(x => x.disabled = false); el.textContent = textoOriginal; }
+      }
+    };
     f.appendChild(el);
   });
   document.body.style.overflow = 'hidden';
