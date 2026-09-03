@@ -1302,6 +1302,7 @@ function abrirLibro(id, esNuevo, pre){
     <div id="splitBox"></div>
   `, [
     {t:'Cancelar', c:'ghost', f:()=>{cerrarModal();}},
+    id && l.posLibroId ? {t:'Quitar del POS', c:'ghost', f:()=>quitarDelPOS([l.codigo, l.posLibroId].filter(Boolean), false)} : null,
     id ? {t:'Eliminar', c:'danger', f:()=>eliminarLibro(id)} : null,
     {t: id?'Guardar cambios':'Guardar y seguir escaneando', f:()=>guardarLibro(id, consId, l)}
   ].filter(Boolean));
@@ -1441,7 +1442,10 @@ async function guardarLibro(id, consId, orig){
 
 async function eliminarLibro(id){
   const l = libroPorId(id);
-  if (!confirm(`¿Eliminar definitivamente ${l.codigo} — ${l.titulo}? Esta acción no se puede deshacer.`)) return;
+  const enPOS = l.posLibroId || l.origenPOS;
+  if (!confirm(`¿Eliminar definitivamente ${l.codigo} — ${l.titulo}?` + (enPOS ? ' También se quitará del módulo de consignación del POS.' : '') + ' Esta acción no se puede deshacer.')) return;
+  if (S.modo === 'nube' && S.cfg.sincronizarPOS !== false)
+    await quitarDelPOS([l.codigo, l.posLibroId].filter(Boolean), true);
   await DB.borrar(COL.libros, id);
   S.libros = S.libros.filter(x=>x.id!==id);
   S.lote = S.lote.filter(x=>x!==id);
@@ -1570,6 +1574,8 @@ async function cambiarEstado(id, nuevo, silencioso){
   const saved = await DB.guardar(COL.libros, l);
   S.libros[S.libros.findIndex(x=>x.id===id)] = saved;
   if (nuevo === 'publicado' && S.cfg.sincronizarPOS !== false) await publicarEnPOS([id], true);
+  if (['retirado','rechazado'].includes(nuevo) && S.cfg.sincronizarPOS !== false)
+    await quitarDelPOS([l.codigo, l.posLibroId].filter(Boolean), true);
   if (!silencioso){ cerrarModal(); pintarTodo(); toast('Situación actualizada','ok'); }
 }
 
@@ -2258,6 +2264,35 @@ async function publicarEnPOS(ids, silencioso){
   }
   if (!silencioso) toast(`${mapa.length} libro(s) enviados al POS`, 'ok');
   return mapa.length;
+}
+
+/* Saca un libro del POS: al retirarlo, rechazarlo o eliminarlo aquí, no puede
+   quedar disponible para venta allá. Nunca toca los que el POS ya vendió,
+   para no romper su historial de ventas. */
+async function quitarDelPOS(claves, silencioso){
+  if (S.modo !== 'nube' || !claves.length) return 0;
+  let n = 0, vendidos = 0;
+  try{
+    await S.db.runTransaction(async tx => {
+      const ref = refConsignaPOS();
+      const doc = await tx.get(ref);
+      const v = (doc.exists && doc.data().v) || { consignantes:[], libros:[], liquidaciones:[] };
+      v.libros = v.libros || [];
+      const quedan = [];
+      for (const pl of v.libros){
+        const coincide = claves.includes(pl.code) || claves.includes(pl.id);
+        if (coincide && pl.estado === 'vendido'){ vendidos++; quedan.push(pl); continue; }
+        if (coincide){ n++; continue; }
+        quedan.push(pl);
+      }
+      v.libros = quedan;
+      tx.set(ref, { v }, { merge:true });
+    });
+  }catch(e){ if (!silencioso) toast('No se pudo quitar del POS: ' + e.message,'err'); return 0; }
+  if (!silencioso && (n || vendidos)){
+    toast(n ? `${n} libro(s) retirados del POS` + (vendidos?` · ${vendidos} no se tocaron porque ya estaban vendidos`:'') : 'El libro ya estaba vendido en el POS: se conserva su registro', n?'ok':'err');
+  }
+  return n;
 }
 
 /* --- POS  →  Segunda Vida: ventas --- */
