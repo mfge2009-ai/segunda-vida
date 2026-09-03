@@ -1,0 +1,2271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Segunda Vida — Consignación · La Madriguera</title>
+<meta name="theme-color" content="#2F5D4A">
+<style>
+:root{
+  --bg:#FAF7F2; --surface:#FFFFFF; --surface-2:#F3EEE6; --line:#E3DACC;
+  --ink:#2B2118; --ink-2:#6B5D4E; --ink-3:#9A8B7A;
+  --verde:#2F5D4A; --verde-2:#3E7A61; --verde-soft:#E8F0EC;
+  --terra:#B4562F; --terra-soft:#FBEDE7;
+  --oro:#C8A24A; --oro-soft:#FBF3DF;
+  --azul:#2E5F8A; --azul-soft:#E9F1F8;
+  --rojo:#B3261E; --rojo-soft:#FBEAE9;
+  --r:14px; --r-s:9px;
+  --sh:0 1px 2px rgba(43,33,24,.06), 0 8px 24px rgba(43,33,24,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--ink);
+  font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased; padding-bottom:env(safe-area-inset-bottom);
+}
+h1,h2,h3,h4{margin:0;font-weight:650;letter-spacing:-.01em}
+a{color:var(--verde);text-decoration:none}
+button,input,select,textarea{font:inherit;color:inherit}
+.hide{display:none !important}
+
+/* ---------- layout ---------- */
+.topbar{
+  position:sticky;top:0;z-index:40;background:var(--verde);color:#fff;
+  padding:10px 16px;display:flex;align-items:center;gap:12px;
+  box-shadow:0 2px 12px rgba(43,33,24,.14);
+}
+.topbar .logo{display:flex;flex-direction:column;line-height:1.15}
+.topbar .logo b{font-size:15px;letter-spacing:.02em}
+.topbar .logo span{font-size:11px;opacity:.75;letter-spacing:.08em;text-transform:uppercase}
+.topbar .spacer{flex:1}
+.chip-user{
+  background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);
+  padding:5px 10px;border-radius:999px;font-size:12px;display:flex;align-items:center;gap:7px;
+}
+.chip-user b{font-weight:600}
+.nav{
+  position:sticky;top:52px;z-index:35;background:var(--surface);border-bottom:1px solid var(--line);
+  display:flex;gap:2px;overflow-x:auto;padding:0 8px;scrollbar-width:none;
+}
+.nav::-webkit-scrollbar{display:none}
+.nav button{
+  background:none;border:0;padding:12px 13px;font-size:13.5px;font-weight:550;color:var(--ink-2);
+  white-space:nowrap;cursor:pointer;border-bottom:2.5px solid transparent;
+}
+.nav button:hover{color:var(--ink)}
+.nav button.on{color:var(--verde);border-bottom-color:var(--verde)}
+.nav .badge{background:var(--terra);color:#fff;border-radius:999px;padding:1px 6px;font-size:10.5px;margin-left:5px;font-weight:700;vertical-align:1px}
+main{max-width:1180px;margin:0 auto;padding:18px 16px 90px}
+.page{display:none}
+.page.on{display:block;animation:fade .18s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+/* ---------- pieces ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--sh);padding:16px;margin-bottom:14px}
+.card > h3{font-size:15px;margin-bottom:3px}
+.card > h3 + p.sub{margin:0 0 14px;color:var(--ink-3);font-size:12.5px}
+.hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.hd h2{font-size:20px}
+.hd .spacer{flex:1}
+.sub{color:var(--ink-3);font-size:12.5px;margin:0}
+
+.grid{display:grid;gap:12px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(180px,1fr))}
+.g4{grid-template-columns:repeat(auto-fit,minmax(150px,1fr))}
+
+label.f{display:block;margin-bottom:11px}
+label.f > span{display:block;font-size:11.5px;font-weight:650;color:var(--ink-2);margin-bottom:5px;letter-spacing:.02em}
+label.f > span em{font-style:normal;color:var(--ink-3);font-weight:500}
+input[type=text],input[type=tel],input[type=email],input[type=number],input[type=date],input[type=password],select,textarea{
+  width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:var(--r-s);background:#fff;outline:none;
+}
+input:focus,select:focus,textarea:focus{border-color:var(--verde-2);box-shadow:0 0 0 3px var(--verde-soft)}
+textarea{min-height:74px;resize:vertical}
+.check{display:flex;gap:9px;align-items:flex-start;padding:10px;background:var(--surface-2);border-radius:var(--r-s);margin-bottom:11px;cursor:pointer}
+.check input{margin-top:2px;width:17px;height:17px;accent-color:var(--verde);flex:none}
+.check span{font-size:13px;line-height:1.45}
+
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  padding:10px 15px;border-radius:var(--r-s);border:1px solid transparent;background:var(--verde);color:#fff;
+  font-weight:600;font-size:13.5px;cursor:pointer;transition:.12s;
+}
+.btn:hover{background:var(--verde-2)}
+.btn:active{transform:translateY(1px)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.ghost{background:#fff;color:var(--ink);border-color:var(--line)}
+.btn.ghost:hover{background:var(--surface-2)}
+.btn.terra{background:var(--terra)} .btn.terra:hover{filter:brightness(1.07)}
+.btn.danger{background:#fff;color:var(--rojo);border-color:#E7C9C6}
+.btn.danger:hover{background:var(--rojo-soft)}
+.btn.sm{padding:6px 10px;font-size:12px}
+.btn.wide{width:100%}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;box-shadow:var(--sh)}
+.kpi .n{font-size:26px;font-weight:700;letter-spacing:-.02em;line-height:1.1}
+.kpi .l{font-size:11.5px;color:var(--ink-3);margin-top:3px;font-weight:550;text-transform:uppercase;letter-spacing:.04em}
+.kpi.v .n{color:var(--verde)} .kpi.t .n{color:var(--terra)} .kpi.o .n{color:#9C7A1E} .kpi.r .n{color:var(--rojo)}
+
+.tag{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;font-size:11px;font-weight:650;letter-spacing:.02em;white-space:nowrap}
+.t-gris{background:var(--surface-2);color:var(--ink-2)}
+.t-azul{background:var(--azul-soft);color:var(--azul)}
+.t-oro{background:var(--oro-soft);color:#8A6A12}
+.t-verde{background:var(--verde-soft);color:var(--verde)}
+.t-terra{background:var(--terra-soft);color:var(--terra)}
+.t-rojo{background:var(--rojo-soft);color:var(--rojo)}
+
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;font-size:10.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);padding:8px 9px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:9px;border-bottom:1px solid var(--surface-2);vertical-align:middle}
+tr:hover td{background:#FDFCFA}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -16px;padding:0 16px}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.empty{text-align:center;padding:34px 16px;color:var(--ink-3);font-size:13.5px}
+.empty b{display:block;color:var(--ink-2);font-size:15px;margin-bottom:5px}
+
+.modal-bg{position:fixed;inset:0;background:rgba(43,33,24,.5);z-index:100;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
+.modal{background:var(--surface);border-radius:var(--r);max-width:720px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.3);margin:auto}
+.modal header{padding:15px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;position:sticky;top:0;background:var(--surface);border-radius:var(--r) var(--r) 0 0;z-index:2}
+.modal header h3{font-size:16px;flex:1}
+.modal .body{padding:18px}
+.modal footer{padding:13px 18px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.x{background:none;border:0;font-size:22px;line-height:1;color:var(--ink-3);cursor:pointer;padding:2px 6px}
+
+#toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,120%);z-index:200;background:var(--ink);color:#fff;padding:11px 18px;border-radius:999px;font-size:13.5px;font-weight:550;box-shadow:0 10px 30px rgba(0,0,0,.25);transition:transform .25s cubic-bezier(.2,.9,.3,1);max-width:90vw;text-align:center}
+#toast.on{transform:translate(-50%,0)}
+#toast.err{background:var(--rojo)}
+#toast.ok{background:var(--verde)}
+
+.note{padding:11px 13px;border-radius:var(--r-s);font-size:12.5px;line-height:1.5;margin-bottom:13px}
+.note.info{background:var(--azul-soft);color:#1F4869;border-left:3px solid var(--azul)}
+.note.warn{background:var(--oro-soft);color:#7A5C0E;border-left:3px solid var(--oro)}
+.note.ok{background:var(--verde-soft);color:var(--verde);border-left:3px solid var(--verde)}
+.note.bad{background:var(--rojo-soft);color:var(--rojo);border-left:3px solid var(--rojo)}
+
+.scanbox{background:linear-gradient(135deg,var(--verde) 0%,#254C3C 100%);color:#fff;border-radius:var(--r);padding:18px;margin-bottom:14px}
+.scanbox h3{font-size:16px;margin-bottom:4px}
+.scanbox p{margin:0 0 13px;font-size:12.5px;opacity:.82}
+.scanbox .inrow{display:flex;gap:8px;flex-wrap:wrap}
+.scanbox input{flex:1;min-width:190px;font-size:17px;padding:12px 13px;border:0;border-radius:var(--r-s);font-family:ui-monospace,Menlo,monospace;letter-spacing:.04em}
+.scanbox .btn{background:#fff;color:var(--verde);border:0;padding:12px 17px}
+.scanbox .btn:hover{background:#F1F7F4}
+.scanbox .btn.o{background:rgba(255,255,255,.14);color:#fff;border:1px solid rgba(255,255,255,.3)}
+
+.bookcard{display:flex;gap:12px;padding:12px;border:1px solid var(--line);border-radius:var(--r-s);background:var(--surface);margin-bottom:9px}
+.bookcard img,.cover{width:52px;height:76px;object-fit:cover;border-radius:5px;background:var(--surface-2);flex:none;border:1px solid var(--line)}
+.cover.ph{display:flex;align-items:center;justify-content:center;color:var(--ink-3);font-size:19px}
+.bookcard .info{flex:1;min-width:0}
+.bookcard .info b{display:block;font-size:13.5px;line-height:1.35}
+.bookcard .info small{color:var(--ink-3);font-size:12px}
+
+.price-panel{background:var(--surface-2);border-radius:var(--r-s);padding:14px}
+.price-big{font-size:34px;font-weight:700;color:var(--verde);letter-spacing:-.02em;line-height:1}
+.price-split{display:flex;gap:10px;margin-top:11px;font-size:12.5px}
+.price-split div{flex:1;background:#fff;border-radius:7px;padding:9px 11px;border:1px solid var(--line)}
+.price-split b{display:block;font-size:16px;margin-top:2px}
+.calc-line{display:flex;justify-content:space-between;font-size:12px;padding:4px 0;color:var(--ink-2);border-bottom:1px dashed var(--line)}
+.calc-line:last-child{border:0}
+.calc-line b{color:var(--ink)}
+
+.thumbs{display:flex;gap:7px;flex-wrap:wrap;margin-top:7px}
+.thumbs .th{position:relative;width:62px;height:62px;border-radius:7px;overflow:hidden;border:1px solid var(--line)}
+.thumbs .th img{width:100%;height:100%;object-fit:cover}
+.thumbs .th button{position:absolute;top:2px;right:2px;background:rgba(0,0,0,.62);color:#fff;border:0;border-radius:50%;width:19px;height:19px;font-size:12px;line-height:1;cursor:pointer}
+
+.pill-group{display:flex;flex-wrap:wrap;gap:6px}
+.pill-group input{position:absolute;opacity:0;pointer-events:none}
+.pill-group label{padding:7px 12px;border:1px solid var(--line);border-radius:999px;font-size:12.5px;cursor:pointer;background:#fff;font-weight:550}
+.pill-group input:checked + label{background:var(--verde);color:#fff;border-color:var(--verde)}
+
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:13px}
+.filters input,.filters select{width:auto;flex:1;min-width:135px;padding:8px 10px;font-size:13px}
+
+/* vista pública de aprobación */
+.pub{max-width:660px;margin:0 auto;padding:16px 15px 70px}
+.pub-hero{background:linear-gradient(135deg,var(--verde),#254C3C);color:#fff;border-radius:var(--r);padding:22px;margin-bottom:16px}
+.pub-hero .eyebrow{font-size:11px;letter-spacing:.14em;text-transform:uppercase;opacity:.75}
+.pub-hero h1{font-size:22px;margin:6px 0 8px}
+.pub-hero p{margin:0;font-size:13.5px;opacity:.9;line-height:1.55}
+.pub-book{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:11px;box-shadow:var(--sh)}
+.pub-book.ok{border-color:var(--verde);background:var(--verde-soft)}
+.pub-book.no{border-color:#E7C9C6;background:var(--rojo-soft)}
+.pub-actions{display:flex;gap:8px;margin-top:11px}
+.pub-actions .btn{flex:1}
+.sticky-bar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -6px 24px rgba(43,33,24,.1);z-index:50}
+.sticky-bar .in{max-width:660px;margin:0 auto;display:flex;gap:10px;align-items:center}
+
+@media (max-width:640px){
+  main{padding:14px 12px 90px}
+  .tw{margin:0 -12px;padding:0 12px}
+  .kpi .n{font-size:22px}
+  .modal-bg{padding:0}
+  .modal{border-radius:0;min-height:100vh}
+  .modal header{border-radius:0}
+}
+@media print{
+  .topbar,.nav,.sticky-bar,.btn,#toast{display:none !important}
+  body{background:#fff}
+  .card{box-shadow:none;border:0}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ ARRANQUE / LOGIN ============ -->
+<div id="gate" class="hide" style="max-width:440px;margin:8vh auto;padding:0 16px">
+  <div class="card" style="padding:24px">
+    <div style="text-align:center;margin-bottom:18px">
+      <div style="font-size:30px">📚</div>
+      <h2 style="font-size:20px;margin-top:6px">Segunda Vida</h2>
+      <p class="sub">Consignación de libros · La Madriguera</p>
+    </div>
+    <div id="gateSetup" class="hide">
+      <div class="note warn">Primer uso en este dispositivo. Pega la configuración de Firebase de La Madriguera (Consola de Firebase → Configuración del proyecto → Tus apps → Configuración del SDK).</div>
+      <label class="f"><span>Configuración de Firebase</span>
+        <textarea id="fbCfg" style="min-height:150px" class="mono" placeholder='{ "apiKey": "...", "authDomain": "la-madriguera-cb489.firebaseapp.com", "projectId": "la-madriguera-cb489", "storageBucket": "...", "messagingSenderId": "...", "appId": "..." }'></textarea>
+      </label>
+      <button class="btn wide" onclick="guardarConfig()">Guardar y conectar</button>
+      <button class="btn ghost wide" style="margin-top:8px" onclick="modoLocal()">Usar en modo local (sin nube)</button>
+      <p class="sub" style="margin-top:10px;text-align:center">El modo local guarda todo solo en este equipo. Sirve para probar la app.</p>
+    </div>
+    <div id="gateLogin" class="hide">
+      <label class="f"><span>Correo</span><input type="email" id="loginMail" autocomplete="username"></label>
+      <label class="f"><span>Contraseña</span><input type="password" id="loginPass" autocomplete="current-password"></label>
+      <button class="btn wide" onclick="entrar()">Entrar</button>
+      <div id="loginErr" class="note bad hide" style="margin-top:12px"></div>
+      <p class="sub" style="margin-top:12px;text-align:center"><a href="#" onclick="olvide();return false">Olvidé mi contraseña</a> · <a href="#" onclick="reconfigurar();return false">Cambiar configuración</a></p>
+    </div>
+    <div id="gateWait"><p class="sub" style="text-align:center">Conectando…</p></div>
+  </div>
+</div>
+
+<!-- ============ VISTA PÚBLICA DE APROBACIÓN ============ -->
+<div id="pubView" class="hide">
+  <div class="topbar"><div class="logo"><b>LA MADRIGUERA</b><span>Segunda Vida</span></div></div>
+  <div class="pub" id="pubBody"></div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app" class="hide">
+<div class="topbar">
+  <div class="logo"><b>LA MADRIGUERA</b><span>Segunda Vida · Consignación</span></div>
+  <div class="spacer"></div>
+  <div class="chip-user" id="chipUser" onclick="irA('ajustes')" style="cursor:pointer"></div>
+</div>
+
+<nav class="nav" id="nav">
+  <button data-p="panel" class="on">Panel</button>
+  <button data-p="consignantes">Consignantes</button>
+  <button data-p="ingreso">Ingreso de libros</button>
+  <button data-p="inventario">Inventario</button>
+  <button data-p="aprobaciones">Aprobaciones <span class="badge hide" id="bgApro">0</span></button>
+  <button data-p="ventas">Ventas y pagos</button>
+  <button data-p="documentos">Documentos</button>
+  <button data-p="exportar">Exportar</button>
+  <button data-p="reportes">Reportes</button>
+  <button data-p="ajustes">Ajustes</button>
+</nav>
+
+<main>
+
+<!-- ---------- PANEL ---------- -->
+<section class="page on" id="p-panel">
+  <div class="hd"><div><h2>Panel</h2><p class="sub" id="panelFecha"></p></div><div class="spacer"></div>
+    <button class="btn" onclick="irA('ingreso')">+ Ingresar libros</button></div>
+  <div class="grid g4" id="kpis"></div>
+  <div class="grid g2" style="margin-top:14px">
+    <div class="card"><h3>Requiere tu atención</h3><p class="sub">Lo que está frenando el flujo hoy</p><div id="panelAlertas"></div></div>
+    <div class="card"><h3>Últimos movimientos</h3><p class="sub">Registro reciente</p><div id="panelUltimos"></div></div>
+  </div>
+  <div class="card"><h3>Vencimientos próximos</h3><p class="sub">Libros que cumplen los 120 días en los próximos 30 días</p><div id="panelVence"></div></div>
+</section>
+
+<!-- ---------- CONSIGNANTES ---------- -->
+<section class="page" id="p-consignantes">
+  <div class="hd"><div><h2>Consignantes</h2><p class="sub">Datos, contrato y estado de cuenta de cada persona</p></div><div class="spacer"></div>
+    <button class="btn" onclick="abrirConsignante()">+ Nuevo consignante</button></div>
+  <div class="filters">
+    <input type="text" id="fCons" placeholder="Buscar por nombre, cédula, teléfono o Instagram…" oninput="pintarConsignantes()">
+    <select id="fConsEstado" onchange="pintarConsignantes()"><option value="">Todos</option><option value="activo">Activos</option><option value="inactivo">Inactivos</option></select>
+  </div>
+  <div class="card" style="padding:0"><div class="tw"><table><thead><tr>
+    <th>Código</th><th>Consignante</th><th>Cédula</th><th>Contacto</th><th>Libros</th><th>Por pagar</th><th>Términos</th><th></th>
+  </tr></thead><tbody id="tbCons"></tbody></table></div><div id="emptyCons"></div></div>
+</section>
+
+<!-- ---------- INGRESO ---------- -->
+<section class="page" id="p-ingreso">
+  <div class="hd"><div><h2>Ingreso de libros</h2><p class="sub">Escanea el ISBN, revisa el estado y define el precio</p></div></div>
+
+  <label class="f" style="max-width:520px"><span>Consignante <em>— selecciona antes de escanear</em></span>
+    <select id="ingCons" onchange="cambioConsignante()"></select></label>
+
+  <div class="scanbox">
+    <h3>Escanear ISBN</h3>
+    <p>Dispara el lector de código de barras sobre la contratapa, o escribe el ISBN y pulsa Enter. Los datos se completan solos.</p>
+    <div class="inrow">
+      <input type="text" id="isbnIn" placeholder="978…" inputmode="numeric" autocomplete="off">
+      <button class="btn" onclick="buscarISBN()">Buscar</button>
+      <button class="btn o" onclick="abrirCamara()">📷 Cámara</button>
+      <button class="btn o" onclick="abrirLibro(null,true)">Ingreso manual</button>
+    </div>
+    <div id="camWrap" class="hide" style="margin-top:12px">
+      <video id="cam" playsinline style="width:100%;max-height:260px;border-radius:9px;background:#000"></video>
+      <div class="row" style="margin-top:8px"><button class="btn o" onclick="cerrarCamara()">Cerrar cámara</button><span id="camMsg" style="font-size:12px;opacity:.85"></span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Lote en curso <span id="loteCount" class="tag t-verde"></span></h3>
+    <p class="sub">Libros capturados en esta sesión de ingreso</p>
+    <div id="loteLista"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn" onclick="enviarAAprobacion()">Enviar precios a aprobación</button>
+      <button class="btn ghost" onclick="irA('documentos')">Generar contrato y anexo</button>
+      <button class="btn ghost" onclick="limpiarLote()">Cerrar lote</button>
+    </div>
+  </div>
+</section>
+
+<!-- ---------- INVENTARIO ---------- -->
+<section class="page" id="p-inventario">
+  <div class="hd"><div><h2>Inventario</h2><p class="sub">Todos los libros del programa y su estado</p></div><div class="spacer"></div>
+    <button class="btn ghost" onclick="irA('exportar')">Exportar CSV</button></div>
+  <div class="filters">
+    <input type="text" id="fInv" placeholder="Buscar por título, autor, ISBN, código o consignante…" oninput="pintarInventario()">
+    <select id="fInvEstado" onchange="pintarInventario()"></select>
+    <select id="fInvCons" onchange="pintarInventario()"></select>
+    <select id="fInvCat" onchange="pintarInventario()"></select>
+  </div>
+  <div class="row" style="margin-bottom:10px">
+    <span class="sub" id="invResumen"></span><div class="spacer"></div>
+    <button class="btn ghost sm" onclick="accionMasiva('publicado')">Marcar publicados</button>
+    <button class="btn ghost sm" onclick="accionMasiva('recalcular')">Recalcular vencidos</button>
+  </div>
+  <div class="card" style="padding:0"><div class="tw"><table><thead><tr>
+    <th><input type="checkbox" id="chkAll" onclick="marcarTodos(this)"></th><th>Código</th><th>Libro</th><th>Consignante</th><th>Estado físico</th><th>Precio</th><th>Situación</th><th>Vence</th><th></th>
+  </tr></thead><tbody id="tbInv"></tbody></table></div><div id="emptyInv"></div></div>
+</section>
+
+<!-- ---------- APROBACIONES ---------- -->
+<section class="page" id="p-aprobaciones">
+  <div class="hd"><div><h2>Aprobaciones de precio</h2><p class="sub">El consignante confirma cada precio antes de que el libro entre a la venta</p></div></div>
+  <div class="note info">Cada lote genera un enlace único. Puedes enviarlo por WhatsApp o Instagram, o abrirlo en tienda desde el celular o la tablet para que el consignante apruebe en el momento. Toda decisión queda registrada con fecha y hora.</div>
+  <div id="listaAprob"></div>
+</section>
+
+<!-- ---------- VENTAS Y PAGOS ---------- -->
+<section class="page" id="p-ventas">
+  <div class="hd"><div><h2>Ventas y pagos</h2><p class="sub">Reparto 70% consignante / 30% La Madriguera y liquidación mensual</p></div></div>
+  <div class="grid g4" id="kpisVentas"></div>
+  <div class="card" style="margin-top:14px">
+    <h3>Registrar venta</h3><p class="sub">Marca el libro vendido y la app calcula el reparto</p>
+    <div class="row">
+      <input type="text" id="ventaBusca" placeholder="Escanea el código interno o el ISBN del libro vendido…" style="flex:1;min-width:220px" onkeydown="if(event.key==='Enter')registrarVentaRapida()">
+      <button class="btn" onclick="registrarVentaRapida()">Registrar venta</button>
+    </div>
+  </div>
+  <div class="card" style="padding:0">
+    <div style="padding:14px 16px 0"><h3>Liquidaciones pendientes por consignante</h3><p class="sub">Pago dentro de los primeros 5 días hábiles del mes siguiente a la venta</p></div>
+    <div class="tw"><table><thead><tr><th>Consignante</th><th>Libros vendidos</th><th>Venta total</th><th>70% consignante</th><th>30% La Madriguera</th><th>Forma de pago</th><th></th></tr></thead><tbody id="tbLiq"></tbody></table></div>
+    <div id="emptyLiq"></div>
+  </div>
+</section>
+
+<!-- ---------- DOCUMENTOS ---------- -->
+<section class="page" id="p-documentos">
+  <div class="hd"><div><h2>Documentos</h2><p class="sub">Contrato de consignación y Anexo A — ficha de ingreso de libros</p></div></div>
+  <div class="card">
+    <div class="grid g2">
+      <label class="f"><span>Consignante</span><select id="docCons" onchange="previsualizarDoc()"></select></label>
+      <label class="f"><span>Qué generar</span><select id="docTipo" onchange="previsualizarDoc()">
+        <option value="completo">Contrato + Anexo A de libros</option>
+        <option value="contrato">Solo contrato</option>
+        <option value="anexo">Solo Anexo A (ficha de ingreso)</option>
+        <option value="precios">Detalle de precios aprobados</option>
+      </select></label>
+    </div>
+    <div class="row">
+      <button class="btn" onclick="descargarPDF()">Descargar PDF</button>
+      <button class="btn ghost" onclick="imprimirDoc()">Imprimir</button>
+      <button class="btn ghost" onclick="previsualizarDoc()">Actualizar vista previa</button>
+    </div>
+  </div>
+  <div class="card"><div id="docPrev" style="font-size:13px;line-height:1.6"></div></div>
+</section>
+
+<!-- ---------- EXPORTAR ---------- -->
+<section class="page" id="p-exportar">
+  <div class="hd"><div><h2>Exportar CSV</h2><p class="sub">Archivos listos para cargar en el POS, en la web y para control interno</p></div></div>
+  <div class="note info">Todos los archivos salen en UTF-8 con BOM, así Excel y Google Sheets abren bien las tildes. Por defecto se exportan solo los libros aprobados o publicados; puedes cambiarlo abajo.</div>
+  <div class="card">
+    <div class="grid g3">
+      <label class="f"><span>Qué libros incluir</span><select id="expEstado">
+        <option value="listos">Aprobados y publicados (recomendado)</option>
+        <option value="aprobado">Solo aprobados sin publicar</option>
+        <option value="publicado">Solo publicados</option>
+        <option value="todos">Todos los libros</option>
+        <option value="vendido">Vendidos</option>
+      </select></label>
+      <label class="f"><span>Consignante</span><select id="expCons"></select></label>
+      <label class="f"><span>Desde fecha de ingreso</span><input type="date" id="expDesde"></label>
+    </div>
+  </div>
+  <div class="grid g3">
+    <div class="card"><h3>POS de ventas</h3><p class="sub">Catálogo de productos para cargar al punto de venta: código de barras, nombre, precio, stock y categoría.</p>
+      <button class="btn wide" onclick="exportar('pos')">Descargar CSV para POS</button></div>
+    <div class="card"><h3>Web de La Madriguera</h3><p class="sub">Ficha de producto para la tienda en línea: SKU, título, autor, descripción, imagen de portada y precio.</p>
+      <button class="btn wide" onclick="exportar('web')">Descargar CSV para la web</button></div>
+    <div class="card"><h3>Inventario interno</h3><p class="sub">Todos los campos: consignante, porcentajes, fechas, estado físico, situación y observaciones.</p>
+      <button class="btn wide" onclick="exportar('interno')">Descargar CSV interno</button></div>
+  </div>
+  <div class="card"><h3>Vista previa</h3><p class="sub">Primeras filas del archivo seleccionado</p><div class="tw" id="expPrev"><p class="sub">Elige un formato para ver la vista previa.</p></div></div>
+</section>
+
+<!-- ---------- REPORTES ---------- -->
+<section class="page" id="p-reportes">
+  <div class="hd"><div><h2>Reportes</h2><p class="sub">Cómo se está moviendo el programa</p></div></div>
+  <div class="filters">
+    <select id="repRango" onchange="pintarReportes()">
+      <option value="30">Últimos 30 días</option><option value="90">Últimos 90 días</option>
+      <option value="120">Últimos 120 días</option><option value="0">Todo el histórico</option>
+    </select>
+    <select id="repCons" onchange="pintarReportes()"></select>
+  </div>
+  <div class="grid g2" id="repCards"></div>
+</section>
+
+<!-- ---------- AJUSTES ---------- -->
+<section class="page" id="p-ajustes">
+  <div class="hd"><div><h2>Ajustes</h2><p class="sub">Parámetros del programa y de la fórmula de precio</p></div></div>
+  <div class="card">
+    <h3>Condiciones del programa</h3><p class="sub">Se aplican al contrato, a los cálculos y a los vencimientos</p>
+    <div class="grid g3">
+      <label class="f"><span>% consignante</span><input type="number" id="cfgPctCons" min="0" max="100" step="1"></label>
+      <label class="f"><span>% La Madriguera</span><input type="number" id="cfgPctLib" min="0" max="100" step="1"></label>
+      <label class="f"><span>Plazo de exhibición (días)</span><input type="number" id="cfgPlazo" min="1" step="1"></label>
+      <label class="f"><span>Días para retiro tras aviso</span><input type="number" id="cfgRetiro" min="1" step="1"></label>
+      <label class="f"><span>Precio mínimo de venta (USD)</span><input type="number" id="cfgMin" min="0" step="0.25"></label>
+      <label class="f"><span>Redondeo del precio (USD)</span><select id="cfgRedondeo"><option value="0.25">A $0.25</option><option value="0.5">A $0.50</option><option value="1">A $1.00</option><option value="0">Sin redondeo</option></select></label>
+    </div>
+  </div>
+  <div class="card">
+    <h3>Fórmula de precio sugerido</h3>
+    <p class="sub">Precio sugerido = precio de referencia × estado × demanda × antigüedad × edición × rotación</p>
+    <div id="cfgFactores"></div>
+  </div>
+  <div class="card">
+    <h3>Datos de la librería</h3>
+    <div class="grid g2">
+      <label class="f"><span>Nombre comercial</span><input type="text" id="cfgNombre"></label>
+      <label class="f"><span>RUC / C.C.</span><input type="text" id="cfgRuc"></label>
+      <label class="f"><span>Representante</span><input type="text" id="cfgRep"></label>
+      <label class="f"><span>Ciudad</span><input type="text" id="cfgCiudad"></label>
+      <label class="f"><span>Dirección del local</span><input type="text" id="cfgDir"></label>
+      <label class="f"><span>Enlace público de aprobación <em>— URL donde publicas esta app</em></span><input type="text" id="cfgUrl" placeholder="https://mfge2009-ai.github.io/segunda-vida/"></label>
+    </div>
+  </div>
+  <div class="row"><button class="btn" onclick="guardarAjustes()">Guardar ajustes</button>
+    <button class="btn ghost" onclick="cargarDemo()">Cargar datos de ejemplo</button>
+    <button class="btn ghost" onclick="respaldar()">Descargar respaldo JSON</button>
+    <button class="btn danger" onclick="salir()">Cerrar sesión</button></div>
+  <div class="card" style="margin-top:14px"><h3>Estado de la conexión</h3><div id="estadoConn" class="sub"></div></div>
+</section>
+
+</main>
+</div>
+
+<div id="modales"></div>
+<div id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script>
+"use strict";
+
+/* =========================================================================
+   SEGUNDA VIDA — Consignación de libros · La Madriguera
+   App de una sola página. Datos en Firestore (proyecto compartido con el POS)
+   o en modo local para pruebas.
+   Colecciones: lm_consig_consignantes · lm_consig_libros ·
+                lm_consig_aprobaciones · lm_consig_config · lm_consig_meta
+   ========================================================================= */
+
+/* ---- 1. Si prefieres dejar la configuración fija en el archivo, pégala aquí
+        y la app dejará de pedirla en cada dispositivo. ---- */
+const FIREBASE_CONFIG_FIJA = null; /* ej: { apiKey:"…", authDomain:"…", projectId:"la-madriguera-cb489", appId:"…" } */
+
+const PREFIJO = 'lm_consig_';
+const COL = {
+  cons:  PREFIJO + 'consignantes',
+  libros:PREFIJO + 'libros',
+  aprob: PREFIJO + 'aprobaciones',
+  cfg:   PREFIJO + 'config',
+  meta:  PREFIJO + 'meta'
+};
+const LS = { cfg:'sv_fbcfg', local:'sv_local', modo:'sv_modo' };
+
+/* ---------------- estado ---------------- */
+const S = {
+  modo:'nube',            // 'nube' | 'local'
+  user:null, rol:null,
+  cons:[], libros:[], aprob:[],
+  lote:[],                 // ids de libros del ingreso en curso
+  cfg:null,
+  db:null, auth:null,
+  camStream:null, camLoop:null
+};
+
+/* ---------------- configuración por defecto ---------------- */
+const CFG_DEF = {
+  pctConsignante:70, pctLibreria:30, plazoDias:120, diasRetiro:15,
+  precioMinimo:3, redondeo:0.5,
+  nombre:'LA MADRIGUERA — CAFÉ Y LIBROS', ruc:'', representante:'',
+  ciudad:'Guayaquil', direccion:'Urdesa Central, Guayaquil',
+  urlPublica:'',
+  factores:{
+    estado:   { nuevo:0.70, muy_bueno:0.60, bueno:0.50, aceptable:0.35 },
+    demanda:  { alta:1.10, media:1.00, baja:0.85 },
+    antiguedad:{ reciente:1.05, media:1.00, antigua:0.95, muy_antigua:0.90 },
+    edicion:  { especial:1.15, comun:1.00, bolsillo:0.92 },
+    rotacion: { rapida:1.05, normal:1.00, lenta:0.90 }
+  }
+};
+
+const ESTADOS_FISICOS = {
+  nuevo:'Nuevo', muy_bueno:'Muy bueno', bueno:'Bueno', aceptable:'Aceptable'
+};
+const SITUACIONES = {
+  recibido:              {t:'Recibido',                 c:'t-gris'},
+  pendiente_revision:    {t:'Pendiente de revisión',    c:'t-gris'},
+  aceptado:              {t:'Aceptado',                 c:'t-azul'},
+  pendiente_aprobacion:  {t:'Pendiente de aprobación',  c:'t-oro'},
+  aprobado:              {t:'Aprobado',                 c:'t-verde'},
+  publicado:             {t:'Publicado',                c:'t-verde'},
+  vendido:               {t:'Vendido',                  c:'t-terra'},
+  pagado:                {t:'Pagado',                   c:'t-verde'},
+  vencido:               {t:'Vencido',                  c:'t-rojo'},
+  retirado:              {t:'Retirado',                 c:'t-gris'},
+  rechazado:             {t:'Rechazado',                c:'t-rojo'}
+};
+const CATEGORIAS = ['Literatura','Romance','Fantasía','Ciencia ficción','Manga y cómic',
+  'Clásicos','Infantil','Juvenil','Terror y misterio','No ficción','Ensayo','Autoayuda',
+  'Historia','Poesía','Arte y diseño','Cocina','Religión','Otros'];
+const DEMANDA_POR_CAT = {
+  'Romance':'alta','Fantasía':'alta','Manga y cómic':'alta','Juvenil':'alta','Infantil':'alta',
+  'Literatura':'media','Clásicos':'media','Terror y misterio':'media','Ciencia ficción':'media',
+  'No ficción':'media','Poesía':'baja','Ensayo':'baja','Historia':'baja','Religión':'baja',
+  'Autoayuda':'media','Arte y diseño':'media','Cocina':'media','Otros':'baja'
+};
+
+/* ---------------- utilidades ---------------- */
+const $  = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+const money = n => '$' + (Number(n)||0).toFixed(2);
+const hoyISO = () => new Date().toISOString().slice(0,10);
+function fechaISO(d){ const x = d instanceof Date ? d : new Date(d); const off = x.getTimezoneOffset()*60000; return new Date(x-off).toISOString().slice(0,10); }
+function fmtFecha(iso){ if(!iso) return '—'; const [a,m,d] = String(iso).slice(0,10).split('-'); return `${d}/${m}/${a}`; }
+function fmtFechaHora(v){ if(!v) return '—'; const d = new Date(v); if(isNaN(d)) return String(v);
+  return d.toLocaleString('es-EC',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
+function sumarDias(iso,n){ const d = new Date(iso+'T12:00:00'); d.setDate(d.getDate()+n); return fechaISO(d); }
+function diasEntre(a,b){ return Math.round((new Date(b+'T12:00:00') - new Date(a+'T12:00:00'))/86400000); }
+function toast(msg, tipo){ const t = $('#toast'); t.textContent = msg; t.className = 'on ' + (tipo||''); clearTimeout(t._t); t._t = setTimeout(()=>t.className='', 3200); }
+function nombreCons(c){ return c ? ((c.nombres||'') + ' ' + (c.apellidos||'')).trim() : '—'; }
+function consPorId(id){ return S.cons.find(c=>c.id===id); }
+function libroPorId(id){ return S.libros.find(l=>l.id===id); }
+function redondear(v){ const r = Number(S.cfg.redondeo)||0; if(!r) return Math.round(v*100)/100; return Math.round(v/r)*r; }
+function limpiarISBN(s){ return String(s||'').replace(/[^0-9Xx]/g,'').toUpperCase(); }
+
+/* ============================ CAPA DE DATOS ============================
+   Misma interfaz para Firestore y para modo local, así el resto del código
+   no cambia según dónde estén guardados los datos.                        */
+const Local = {
+  leer(){ try { return JSON.parse(localStorage.getItem(LS.local)) || {}; } catch(e){ return {}; } },
+  guardar(d){ localStorage.setItem(LS.local, JSON.stringify(d)); }
+};
+
+const DB = {
+  async lista(col){
+    if (S.modo === 'local'){ const d = Local.leer(); return (d[col]||[]).slice(); }
+    const snap = await S.db.collection(col).get();
+    return snap.docs.map(x => ({ id:x.id, ...x.data() }));
+  },
+  async obtener(col,id){
+    if (S.modo === 'local'){ const d = Local.leer(); return (d[col]||[]).find(x=>x.id===id) || null; }
+    const doc = await S.db.collection(col).doc(id).get();
+    return doc.exists ? { id:doc.id, ...doc.data() } : null;
+  },
+  async guardar(col, obj){
+    const o = JSON.parse(JSON.stringify(obj));
+    if (!o.id) o.id = uid();
+    o.actualizado = new Date().toISOString();
+    if (S.modo === 'local'){
+      const d = Local.leer(); d[col] = d[col] || [];
+      const i = d[col].findIndex(x=>x.id===o.id);
+      if (i >= 0) d[col][i] = o; else d[col].push(o);
+      Local.guardar(d); return o;
+    }
+    const { id, ...resto } = o;
+    await S.db.collection(col).doc(id).set(resto, { merge:false });
+    return o;
+  },
+  async borrar(col,id){
+    if (S.modo === 'local'){ const d = Local.leer(); d[col] = (d[col]||[]).filter(x=>x.id!==id); Local.guardar(d); return; }
+    await S.db.collection(col).doc(id).delete();
+  },
+  /* correlativo seguro: transacción en la nube, contador simple en local */
+  async siguienteCodigo(tipo){
+    const prefijo = tipo === 'cons' ? 'C-' : 'SV-';
+    if (S.modo === 'local'){
+      const d = Local.leer(); d.contadores = d.contadores || { cons:0, libros:0 };
+      d.contadores[tipo] = (d.contadores[tipo]||0) + 1; Local.guardar(d);
+      return prefijo + String(d.contadores[tipo]).padStart(4,'0');
+    }
+    const ref = S.db.collection(COL.meta).doc('contadores');
+    const n = await S.db.runTransaction(async tx => {
+      const doc = await tx.get(ref);
+      const data = doc.exists ? doc.data() : { cons:0, libros:0 };
+      const val = (data[tipo]||0) + 1;
+      tx.set(ref, { ...data, [tipo]:val }, { merge:true });
+      return val;
+    });
+    return prefijo + String(n).padStart(4,'0');
+  }
+};
+
+/* ============================ ARRANQUE ============================ */
+window.addEventListener('DOMContentLoaded', iniciar);
+
+async function iniciar(){
+  // ¿link público de aprobación?  #/aprobar/TOKEN
+  const h = location.hash || '';
+  const mAp = h.match(/#\/aprobar\/([A-Za-z0-9_-]+)/);
+  if (mAp){ return arrancarVistaPublica(mAp[1]); }
+
+  $('#gate').classList.remove('hide');
+  const modo = localStorage.getItem(LS.modo);
+  if (modo === 'local'){ S.modo = 'local'; return arrancarApp(); }
+
+  const cfg = FIREBASE_CONFIG_FIJA || leerCfgGuardada();
+  if (!cfg){ $('#gateWait').classList.add('hide'); $('#gateSetup').classList.remove('hide'); return; }
+  conectarFirebase(cfg);
+}
+
+function leerCfgGuardada(){ try { return JSON.parse(localStorage.getItem(LS.cfg)); } catch(e){ return null; } }
+
+function conectarFirebase(cfg){
+  try{
+    if (!firebase.apps.length) firebase.initializeApp(cfg);
+    S.db = firebase.firestore(); S.auth = firebase.auth(); S.modo = 'nube';
+  }catch(e){
+    $('#gateWait').classList.add('hide'); $('#gateSetup').classList.remove('hide');
+    toast('No se pudo conectar con Firebase: ' + e.message, 'err'); return;
+  }
+  S.auth.onAuthStateChanged(async u => {
+    if (!u){ $('#gateWait').classList.add('hide'); $('#gateSetup').classList.add('hide'); $('#gateLogin').classList.remove('hide'); return; }
+    S.user = u;
+    try {
+      const rd = await S.db.collection('roles').doc(u.uid).get();
+      S.rol = rd.exists ? (rd.data().rol || null) : null;
+    } catch(e){ S.rol = null; }
+    if (S.rol && !['admin','consig','pos'].includes(S.rol)){
+      $('#gateWait').classList.add('hide'); $('#gateLogin').classList.remove('hide');
+      $('#loginErr').classList.remove('hide');
+      $('#loginErr').textContent = 'Tu usuario no tiene permiso para la app de consignación. Pide a la administradora que te asigne el rol "consig" o "admin".';
+      await S.auth.signOut(); return;
+    }
+    arrancarApp();
+  });
+}
+
+function guardarConfig(){
+  let txt = $('#fbCfg').value.trim();
+  if (!txt) return toast('Pega la configuración de Firebase', 'err');
+  txt = txt.replace(/^\s*(const|var|let)?\s*firebaseConfig\s*=\s*/,'').replace(/;\s*$/,'');
+  let cfg;
+  try { cfg = JSON.parse(txt); }
+  catch(e){ try { cfg = (new Function('return (' + txt + ')'))(); } catch(e2){ return toast('La configuración no se entiende. Copia el objeto completo con llaves { }.','err'); } }
+  if (!cfg || !cfg.apiKey || !cfg.projectId) return toast('Faltan apiKey o projectId en la configuración','err');
+  localStorage.setItem(LS.cfg, JSON.stringify(cfg));
+  localStorage.removeItem(LS.modo);
+  $('#gateSetup').classList.add('hide'); $('#gateWait').classList.remove('hide');
+  conectarFirebase(cfg);
+}
+function modoLocal(){ localStorage.setItem(LS.modo,'local'); S.modo='local'; arrancarApp(); }
+function reconfigurar(){ localStorage.removeItem(LS.cfg); localStorage.removeItem(LS.modo); location.reload(); }
+
+async function entrar(){
+  const mail = $('#loginMail').value.trim(), pass = $('#loginPass').value;
+  if (!mail || !pass) return toast('Ingresa correo y contraseña','err');
+  $('#loginErr').classList.add('hide');
+  try { await S.auth.signInWithEmailAndPassword(mail, pass); }
+  catch(e){
+    const m = { 'auth/invalid-credential':'Correo o contraseña incorrectos.',
+                'auth/wrong-password':'Contraseña incorrecta.',
+                'auth/user-not-found':'No existe un usuario con ese correo.',
+                'auth/too-many-requests':'Demasiados intentos. Espera unos minutos.' }[e.code] || e.message;
+    $('#loginErr').textContent = m; $('#loginErr').classList.remove('hide');
+  }
+}
+async function olvide(){
+  const mail = $('#loginMail').value.trim();
+  if (!mail) return toast('Escribe tu correo primero','err');
+  try { await S.auth.sendPasswordResetEmail(mail); toast('Te enviamos un correo para restablecer la contraseña','ok'); }
+  catch(e){ toast(e.message,'err'); }
+}
+async function salir(){
+  if (S.modo === 'local'){ if(!confirm('En modo local esto solo cierra la vista. ¿Continuar?')) return; localStorage.removeItem(LS.modo); location.reload(); return; }
+  await S.auth.signOut(); location.reload();
+}
+
+async function arrancarApp(){
+  $('#gate').classList.add('hide');
+  $('#app').classList.remove('hide');
+  await cargarTodo();
+  construirNav();
+  pintarTodo();
+}
+
+async function cargarTodo(){
+  try{
+    const [cons, libros, aprob, cfgDoc] = await Promise.all([
+      DB.lista(COL.cons), DB.lista(COL.libros), DB.lista(COL.aprob), DB.obtener(COL.cfg,'general')
+    ]);
+    S.cons = cons; S.libros = libros; S.aprob = aprob;
+    S.cfg = Object.assign({}, CFG_DEF, cfgDoc || {});
+    S.cfg.factores = Object.assign({}, CFG_DEF.factores, (cfgDoc && cfgDoc.factores) || {});
+  }catch(e){
+    S.cfg = Object.assign({}, CFG_DEF);
+    toast('No se pudieron leer los datos: ' + e.message, 'err');
+  }
+  recalcularVencidos(false);
+  await sincronizarAprobaciones();
+}
+
+function construirNav(){
+  $$('#nav button').forEach(b => b.onclick = () => irA(b.dataset.p));
+  const u = S.modo === 'local' ? 'Modo local' : (S.user ? S.user.email : '');
+  $('#chipUser').innerHTML = (S.modo==='local'?'💾 ':'👤 ') + '<b>' + esc(u) + '</b>';
+}
+
+function irA(p){
+  $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
+  $$('.page').forEach(s => s.classList.toggle('on', s.id === 'p-' + p));
+  window.scrollTo({top:0,behavior:'smooth'});
+  if (p === 'panel') pintarPanel();
+  if (p === 'consignantes') pintarConsignantes();
+  if (p === 'ingreso') pintarIngreso();
+  if (p === 'inventario') pintarInventario();
+  if (p === 'aprobaciones') pintarAprobaciones();
+  if (p === 'ventas') pintarVentas();
+  if (p === 'documentos') { llenarSelectCons('docCons'); previsualizarDoc(); }
+  if (p === 'exportar') llenarSelectCons('expCons', true);
+  if (p === 'reportes') { llenarSelectCons('repCons', true); pintarReportes(); }
+  if (p === 'ajustes') pintarAjustes();
+}
+
+function pintarTodo(){
+  pintarPanel(); pintarConsignantes(); pintarIngreso(); pintarInventario();
+  pintarAprobaciones(); pintarVentas(); pintarAjustes();
+  llenarSelectCons('docCons'); llenarSelectCons('expCons', true); llenarSelectCons('repCons', true);
+  const pend = S.aprob.filter(a=>a.estado==='pendiente').length;
+  const bg = $('#bgApro'); bg.textContent = pend; bg.classList.toggle('hide', !pend);
+}
+
+/* ============================ CONSIGNANTES ============================ */
+function pintarConsignantes(){
+  const q = ($('#fCons').value||'').toLowerCase().trim();
+  const fe = $('#fConsEstado').value;
+  let lista = S.cons.slice().sort((a,b)=> (b.creado||'').localeCompare(a.creado||''));
+  if (fe) lista = lista.filter(c => (fe==='activo') === (c.activo !== false));
+  if (q) lista = lista.filter(c => [nombreCons(c),c.cedula,c.telefono,c.instagram,c.email,c.codigo].join(' ').toLowerCase().includes(q));
+
+  $('#tbCons').innerHTML = lista.map(c => {
+    const libros = S.libros.filter(l => l.consignanteId === c.id);
+    const porPagar = libros.filter(l => l.estado==='vendido').reduce((s,l)=> s + (l.venta ? l.venta.montoConsignante : 0), 0);
+    return `<tr>
+      <td class="mono">${esc(c.codigo||'—')}</td>
+      <td><b>${esc(nombreCons(c))}</b>${c.instagram?`<br><small style="color:var(--ink-3)">@${esc(String(c.instagram).replace(/^@/,''))}</small>`:''}</td>
+      <td class="mono">${esc(c.cedula||'—')}</td>
+      <td>${esc(c.telefono||'—')}${c.email?`<br><small style="color:var(--ink-3)">${esc(c.email)}</small>`:''}</td>
+      <td>${libros.length}</td>
+      <td>${porPagar>0?`<b style="color:var(--terra)">${money(porPagar)}</b>`:'—'}</td>
+      <td>${c.aceptaTerminos?'<span class="tag t-verde">Aceptados</span>':'<span class="tag t-rojo">Pendiente</span>'}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn ghost sm" onclick="verConsignante('${c.id}')">Ver</button>
+        <button class="btn ghost sm" onclick="abrirConsignante('${c.id}')">Editar</button>
+      </td></tr>`;
+  }).join('');
+  $('#emptyCons').innerHTML = lista.length ? '' :
+    `<div class="empty"><b>Todavía no hay consignantes</b>Registra a la primera persona que traiga sus libros y la app se encarga del resto.</div>`;
+}
+
+function abrirConsignante(id){
+  const c = id ? consPorId(id) : {};
+  modal(id?'Editar consignante':'Nuevo consignante', `
+    <div class="grid g2">
+      <label class="f"><span>Nombres *</span><input type="text" id="cN" value="${esc(c.nombres||'')}"></label>
+      <label class="f"><span>Apellidos *</span><input type="text" id="cA" value="${esc(c.apellidos||'')}"></label>
+      <label class="f"><span>Cédula de identidad *</span><input type="text" id="cC" inputmode="numeric" value="${esc(c.cedula||'')}"></label>
+      <label class="f"><span>Celular / WhatsApp *</span><input type="tel" id="cT" value="${esc(c.telefono||'')}"></label>
+      <label class="f"><span>Correo electrónico</span><input type="email" id="cE" value="${esc(c.email||'')}"></label>
+      <label class="f"><span>Instagram u otra red <em>— opcional</em></span><input type="text" id="cI" value="${esc(c.instagram||'')}" placeholder="@usuario"></label>
+    </div>
+    <label class="f"><span>Dirección <em>— opcional</em></span><input type="text" id="cD" value="${esc(c.direccion||'')}"></label>
+    <div class="grid g2">
+      <label class="f"><span>Forma de pago preferida</span><select id="cP">
+        ${['efectivo','transferencia','credito'].map(v=>`<option value="${v}" ${c.formaPago===v?'selected':''}>${v==='efectivo'?'Efectivo':v==='transferencia'?'Transferencia bancaria':'Crédito de tienda'}</option>`).join('')}
+      </select></label>
+      <label class="f"><span>Datos para la transferencia <em>— banco y tipo de cuenta</em></span><input type="text" id="cB" value="${esc(c.datosPago||'')}" placeholder="Banco Pichincha · ahorros"></label>
+    </div>
+    <label class="f"><span>Notas internas</span><textarea id="cO" style="min-height:56px">${esc(c.notas||'')}</textarea></label>
+    <label class="check"><input type="checkbox" id="cTerm" ${c.aceptaTerminos?'checked':''}>
+      <span><b>Acepta los términos del programa Segunda Vida.</b> Reparto ${S.cfg.pctConsignante}% consignante / ${S.cfg.pctLibreria}% La Madriguera, exhibición de ${S.cfg.plazoDias} días, pago mensual dentro de los primeros 5 días hábiles del mes siguiente a la venta, y ${S.cfg.diasRetiro} días para retirar los libros no vendidos tras el aviso.</span></label>
+    ${id?'':'<div class="note info">Al guardar se genera el código del consignante y queda listo para recibir libros.</div>'}
+  `, [
+    {t:'Cancelar', c:'ghost', f:cerrarModal},
+    {t:'Guardar', f:()=>guardarConsignante(id)}
+  ]);
+}
+
+async function guardarConsignante(id){
+  const c = id ? Object.assign({}, consPorId(id)) : { creado:new Date().toISOString(), activo:true };
+  c.nombres = $('#cN').value.trim(); c.apellidos = $('#cA').value.trim();
+  c.cedula = $('#cC').value.trim(); c.telefono = $('#cT').value.trim();
+  c.email = $('#cE').value.trim(); c.instagram = $('#cI').value.trim();
+  c.direccion = $('#cD').value.trim(); c.formaPago = $('#cP').value;
+  c.datosPago = $('#cB').value.trim(); c.notas = $('#cO').value.trim();
+  const acepta = $('#cTerm').checked;
+  if (acepta && !c.aceptaTerminos) c.fechaAceptacion = new Date().toISOString();
+  c.aceptaTerminos = acepta;
+  if (!c.nombres || !c.apellidos) return toast('Nombres y apellidos son obligatorios','err');
+  if (!c.cedula) return toast('La cédula es obligatoria','err');
+  if (!c.telefono) return toast('El celular es obligatorio','err');
+  const dup = S.cons.find(x => x.cedula && x.cedula === c.cedula && x.id !== id);
+  if (dup) return toast('Ya existe un consignante con esa cédula: ' + nombreCons(dup),'err');
+  if (!c.codigo) c.codigo = await DB.siguienteCodigo('cons');
+  const saved = await DB.guardar(COL.cons, c);
+  const i = S.cons.findIndex(x=>x.id===saved.id);
+  if (i>=0) S.cons[i] = saved; else S.cons.push(saved);
+  cerrarModal(); pintarTodo(); toast('Consignante guardado','ok');
+}
+
+function verConsignante(id){
+  const c = consPorId(id); if(!c) return;
+  const libros = S.libros.filter(l => l.consignanteId === id);
+  const vendidos = libros.filter(l => ['vendido','pagado'].includes(l.estado));
+  const porPagar = libros.filter(l=>l.estado==='vendido').reduce((s,l)=>s+(l.venta?l.venta.montoConsignante:0),0);
+  const pagado = libros.filter(l=>l.estado==='pagado').reduce((s,l)=>s+(l.venta?l.venta.montoConsignante:0),0);
+  modal('Ficha de ' + nombreCons(c), `
+    <div class="grid g4" style="margin-bottom:14px">
+      <div class="kpi"><div class="n">${libros.length}</div><div class="l">Libros</div></div>
+      <div class="kpi v"><div class="n">${vendidos.length}</div><div class="l">Vendidos</div></div>
+      <div class="kpi t"><div class="n">${money(porPagar)}</div><div class="l">Por pagar</div></div>
+      <div class="kpi"><div class="n">${money(pagado)}</div><div class="l">Ya pagado</div></div>
+    </div>
+    <div class="card" style="box-shadow:none">
+      <div class="grid g2" style="font-size:13px">
+        <div><b>Código:</b> ${esc(c.codigo||'—')}</div>
+        <div><b>Cédula:</b> ${esc(c.cedula||'—')}</div>
+        <div><b>Celular:</b> ${esc(c.telefono||'—')}</div>
+        <div><b>Correo:</b> ${esc(c.email||'—')}</div>
+        <div><b>Instagram:</b> ${esc(c.instagram||'—')}</div>
+        <div><b>Dirección:</b> ${esc(c.direccion||'—')}</div>
+        <div><b>Forma de pago:</b> ${esc(c.formaPago||'—')} ${esc(c.datosPago?'· '+c.datosPago:'')}</div>
+        <div><b>Términos:</b> ${c.aceptaTerminos?('Aceptados el '+fmtFechaHora(c.fechaAceptacion)):'Pendientes'}</div>
+      </div>
+      ${c.notas?`<p class="sub" style="margin-top:10px"><b>Notas:</b> ${esc(c.notas)}</p>`:''}
+    </div>
+    <h4 style="margin:14px 0 8px;font-size:13px">Libros de este consignante</h4>
+    <div class="tw"><table><thead><tr><th>Código</th><th>Título</th><th>Estado</th><th>Precio</th><th>Situación</th><th>Vence</th></tr></thead>
+    <tbody>${libros.length?libros.map(l=>`<tr>
+      <td class="mono">${esc(l.codigo)}</td><td>${esc(l.titulo)}</td>
+      <td>${ESTADOS_FISICOS[l.estadoFisico]||'—'}</td><td>${money(l.precioFinal||l.precioSugerido)}</td>
+      <td><span class="tag ${SITUACIONES[l.estado].c}">${SITUACIONES[l.estado].t}</span></td>
+      <td>${fmtFecha(l.fechaLimite)}</td></tr>`).join('')
+      :'<tr><td colspan="6" class="sub" style="padding:16px">Sin libros registrados.</td></tr>'}</tbody></table></div>
+  `, [
+    {t:'Cerrar', c:'ghost', f:cerrarModal},
+    {t:'Generar contrato', c:'ghost', f:()=>{ cerrarModal(); irA('documentos'); $('#docCons').value = id; previsualizarDoc(); }},
+    {t:'Ingresar libros', f:()=>{ cerrarModal(); irA('ingreso'); $('#ingCons').value = id; cambioConsignante(); }}
+  ]);
+}
+
+function llenarSelectCons(elId, conTodos){
+  const el = $('#'+elId); if(!el) return;
+  const prev = el.value;
+  const opts = S.cons.slice().sort((a,b)=>nombreCons(a).localeCompare(nombreCons(b)))
+    .map(c=>`<option value="${c.id}">${esc(nombreCons(c))}${c.codigo?' · '+esc(c.codigo):''}</option>`).join('');
+  el.innerHTML = (conTodos ? '<option value="">Todos los consignantes</option>' : '<option value="">— Selecciona —</option>') + opts;
+  if (prev) el.value = prev;
+}
+
+/* ============================ FÓRMULA DE PRECIO ============================ */
+function calcularPrecio(l){
+  const f = S.cfg.factores;
+  const base = Number(l.precioNuevoEst) || 0;
+  const fe = f.estado[l.estadoFisico] != null ? f.estado[l.estadoFisico] : 0.5;
+  const fd = f.demanda[l.demanda] != null ? f.demanda[l.demanda] : 1;
+  const fa = f.antiguedad[l.antiguedad] != null ? f.antiguedad[l.antiguedad] : 1;
+  const fi = f.edicion[l.edicion] != null ? f.edicion[l.edicion] : 1;
+  const fr = f.rotacion[l.rotacion] != null ? f.rotacion[l.rotacion] : 1;
+  const bruto = base * fe * fd * fa * fi * fr;
+  let precio = redondear(bruto);
+  const min = Number(S.cfg.precioMinimo)||0;
+  let ajustadoAlMinimo = false;
+  if (base > 0 && precio < min){ precio = min; ajustadoAlMinimo = true; }
+  return { base, fe, fd, fa, fi, fr, bruto, precio, ajustadoAlMinimo };
+}
+function antiguedadPorAnio(anio){
+  const a = parseInt(anio,10); if(!a) return 'media';
+  const d = (new Date()).getFullYear() - a;
+  if (d <= 2) return 'reciente';
+  if (d <= 10) return 'media';
+  if (d <= 20) return 'antigua';
+  return 'muy_antigua';
+}
+
+/* ============================ BÚSQUEDA POR ISBN ============================ */
+async function buscarISBN(){
+  const raw = $('#isbnIn').value;
+  const isbn = limpiarISBN(raw);
+  if (!$('#ingCons').value) return toast('Primero selecciona el consignante','err');
+  if (isbn.length < 10) return toast('El ISBN debe tener 10 o 13 dígitos','err');
+  const yaEsta = S.libros.find(l => limpiarISBN(l.isbn) === isbn && !['retirado','rechazado','pagado'].includes(l.estado));
+  if (yaEsta){
+    const c = consPorId(yaEsta.consignanteId);
+    if (!confirm(`Ya hay un ejemplar de este ISBN en el programa (${yaEsta.codigo} — ${nombreCons(c)}). ¿Ingresar otro ejemplar igual?`)) { $('#isbnIn').value=''; return; }
+  }
+  toast('Buscando el libro…');
+  const datos = await consultarISBN(isbn);
+  $('#isbnIn').value = ''; $('#isbnIn').focus();
+  if (!datos){
+    toast('No se encontró el ISBN. Complétalo a mano.','err');
+    abrirLibro(null, true, { isbn });
+    return;
+  }
+  abrirLibro(null, true, datos);
+}
+
+async function consultarISBN(isbn){
+  // 1) Google Books
+  try{
+    const r = await fetch('https://www.googleapis.com/books/v1/volumes?q=isbn:' + encodeURIComponent(isbn));
+    const j = await r.json();
+    if (j.totalItems > 0){
+      const v = j.items[0].volumeInfo || {};
+      return {
+        isbn,
+        titulo: v.title + (v.subtitle ? ': ' + v.subtitle : ''),
+        autor: (v.authors||[]).join(', '),
+        editorial: v.publisher || '',
+        anio: (v.publishedDate||'').slice(0,4),
+        paginas: v.pageCount || '',
+        idioma: v.language || '',
+        categoria: mapearCategoria((v.categories||[]).join(' ')),
+        descripcion: (v.description||'').slice(0,900),
+        portadaUrl: v.imageLinks ? (v.imageLinks.thumbnail||v.imageLinks.smallThumbnail||'').replace(/^http:/,'https:') : '',
+        fuente:'Google Books'
+      };
+    }
+  }catch(e){ /* sigue con OpenLibrary */ }
+  // 2) Open Library
+  try{
+    const r = await fetch('https://openlibrary.org/api/books?bibkeys=ISBN:' + encodeURIComponent(isbn) + '&format=json&jscmd=data');
+    const j = await r.json();
+    const k = 'ISBN:' + isbn;
+    if (j[k]){
+      const v = j[k];
+      return {
+        isbn,
+        titulo: v.title + (v.subtitle ? ': ' + v.subtitle : ''),
+        autor: (v.authors||[]).map(a=>a.name).join(', '),
+        editorial: (v.publishers||[]).map(p=>p.name).join(', '),
+        anio: (v.publish_date||'').match(/\d{4}/) ? v.publish_date.match(/\d{4}/)[0] : '',
+        paginas: v.number_of_pages || '',
+        categoria: mapearCategoria((v.subjects||[]).map(s=>s.name).join(' ')),
+        descripcion: (v.notes && v.notes.value) ? String(v.notes.value).slice(0,900) : '',
+        portadaUrl: v.cover ? (v.cover.medium || v.cover.small || '') : '',
+        fuente:'Open Library'
+      };
+    }
+  }catch(e){}
+  return null;
+}
+
+function mapearCategoria(txt){
+  const t = (txt||'').toLowerCase();
+  const m = [
+    [/romance|love stor/,'Romance'],
+    [/fantasy|fantas/,'Fantasía'],
+    [/science fiction|ciencia ficc/,'Ciencia ficción'],
+    [/comic|manga|graphic novel/,'Manga y cómic'],
+    [/juvenile|young adult|juvenil/,'Juvenil'],
+    [/children|infantil|picture book/,'Infantil'],
+    [/horror|thriller|mystery|detective|terror|misterio/,'Terror y misterio'],
+    [/poetry|poes/,'Poesía'],
+    [/history|histor/,'Historia'],
+    [/cook|cocina|recip/,'Cocina'],
+    [/art|design|photograph|arte|dise/,'Arte y diseño'],
+    [/religio|bible|espiritual/,'Religión'],
+    [/self-help|autoayuda|psycholog/,'Autoayuda'],
+    [/essay|ensayo|philosoph/,'Ensayo'],
+    [/classic|clásic/,'Clásicos'],
+    [/fiction|literatur|novel/,'Literatura']
+  ];
+  for (const [re,cat] of m) if (re.test(t)) return cat;
+  return '';
+}
+
+/* ---- cámara: lector de códigos de barras nativo del navegador ---- */
+async function abrirCamara(){
+  if (!('BarcodeDetector' in window)){
+    return toast('Este navegador no lee códigos con la cámara. Usa el lector de mano o Chrome en Android.','err');
+  }
+  try{
+    S.camStream = await navigator.mediaDevices.getUserMedia({ video:{ facingMode:'environment' } });
+    const v = $('#cam'); v.srcObject = S.camStream; await v.play();
+    $('#camWrap').classList.remove('hide'); $('#camMsg').textContent = 'Apunta al código de barras…';
+    const det = new BarcodeDetector({ formats:['ean_13','ean_8','isbn_13','upc_a'] });
+    S.camLoop = setInterval(async ()=>{
+      try{
+        const codes = await det.detect(v);
+        if (codes.length){
+          const val = codes[0].rawValue;
+          cerrarCamara();
+          $('#isbnIn').value = val;
+          buscarISBN();
+        }
+      }catch(e){}
+    }, 450);
+  }catch(e){ toast('No se pudo abrir la cámara: ' + e.message,'err'); }
+}
+function cerrarCamara(){
+  clearInterval(S.camLoop);
+  if (S.camStream) S.camStream.getTracks().forEach(t=>t.stop());
+  S.camStream = null; $('#camWrap').classList.add('hide');
+}
+
+/* ============================ FICHA DEL LIBRO ============================ */
+let FOTOS_TMP = [];
+
+function abrirLibro(id, esNuevo, pre){
+  const l = id ? Object.assign({}, libroPorId(id)) : Object.assign({
+    estadoFisico:'bueno', aceptado:true, danios:[], fotos:[], edicion:'comun', rotacion:'normal'
+  }, pre||{});
+  if (!l.demanda) l.demanda = DEMANDA_POR_CAT[l.categoria] || 'media';
+  if (!l.antiguedad) l.antiguedad = antiguedadPorAnio(l.anio);
+  FOTOS_TMP = (l.fotos||[]).slice();
+  const consId = id ? l.consignanteId : $('#ingCons').value;
+  const c = consPorId(consId);
+
+  const pillas = (name, obj, val) => Object.entries(obj).map(([k,v])=>
+    `<input type="radio" name="${name}" id="${name}_${k}" value="${k}" ${val===k?'checked':''} onchange="recalc()"><label for="${name}_${k}">${v}</label>`).join('');
+
+  modal(id ? 'Libro ' + l.codigo : 'Nuevo libro', `
+    <div class="note ${l.fuente?'ok':'info'}" style="${l.fuente?'':'display:none'}">Datos completados automáticamente desde ${esc(l.fuente||'')}. Revisa y corrige lo que haga falta.</div>
+    <p class="sub" style="margin:-6px 0 12px">Consignante: <b>${esc(nombreCons(c))}</b></p>
+
+    <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin-bottom:9px">Datos del libro</h4>
+    <div class="grid g2">
+      <label class="f"><span>ISBN</span><input type="text" id="lIsbn" class="mono" value="${esc(l.isbn||'')}"></label>
+      <label class="f"><span>Título *</span><input type="text" id="lTit" value="${esc(l.titulo||'')}"></label>
+      <label class="f"><span>Autor</span><input type="text" id="lAut" value="${esc(l.autor||'')}"></label>
+      <label class="f"><span>Editorial</span><input type="text" id="lEd" value="${esc(l.editorial||'')}"></label>
+      <label class="f"><span>Año</span><input type="number" id="lAnio" value="${esc(l.anio||'')}" onchange="autoAntiguedad()"></label>
+      <label class="f"><span>Categoría</span><select id="lCat" onchange="autoDemanda()">
+        <option value="">— Sin categoría —</option>
+        ${CATEGORIAS.map(x=>`<option value="${x}" ${l.categoria===x?'selected':''}>${x}</option>`).join('')}
+      </select></label>
+    </div>
+    <label class="f"><span>Descripción breve <em>— se usa en la web</em></span><textarea id="lDesc" style="min-height:60px">${esc(l.descripcion||'')}</textarea></label>
+    <label class="f"><span>URL de portada</span><input type="text" id="lPort" class="mono" value="${esc(l.portadaUrl||'')}" oninput="verPortada()"></label>
+    <div id="portPrev" style="margin:-4px 0 12px"></div>
+
+    <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin:16px 0 9px">Estado físico</h4>
+    <div class="pill-group" style="margin-bottom:12px">${pillas('lEst', ESTADOS_FISICOS, l.estadoFisico)}</div>
+    <label class="f"><span>Daños visibles <em>— marca lo que aplique</em></span>
+      <div class="pill-group" id="lDanios">
+        ${['Lomo marcado','Tapa doblada','Subrayados','Anotaciones','Páginas sueltas','Manchas','Amarillamiento','Sello o dedicatoria','Sobrecubierta ausente']
+          .map((d,i)=>`<input type="checkbox" id="dn${i}" value="${d}" ${(l.danios||[]).includes(d)?'checked':''}><label for="dn${i}">${d}</label>`).join('')}
+      </div></label>
+    <label class="f"><span>Observaciones</span><textarea id="lObs" style="min-height:54px">${esc(l.observaciones||'')}</textarea></label>
+    <label class="f"><span>Fotos del libro <em>— hasta 3, se comprimen solas</em></span>
+      <input type="file" accept="image/*" capture="environment" multiple onchange="agregarFotos(this)">
+      <div class="thumbs" id="thumbs"></div></label>
+
+    <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin:16px 0 9px">Aceptación</h4>
+    <label class="check"><input type="checkbox" id="lAcep" ${l.aceptado!==false?'checked':''} onchange="toggleRechazo()">
+      <span>El libro <b>se acepta</b> en el programa. Desmárcalo si se devuelve al consignante.</span></label>
+    <label class="f ${l.aceptado===false?'':'hide'}" id="wrapRech"><span>Motivo del rechazo</span>
+      <select id="lMot">${['Humedad, hongos u olor','Páginas faltantes o sueltas','Subrayados o anotaciones extensas','Daño estructural (lomo, tapas)','Edición fotocopiada o pirata','Contenido no acorde a la curaduría','Género sin demanda','Sin espacio de exhibición']
+        .map(m=>`<option ${l.motivoRechazo===m?'selected':''}>${m}</option>`).join('')}</select></label>
+
+    <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin:16px 0 9px">Precio</h4>
+    <div class="grid g2">
+      <label class="f"><span>Precio de referencia del libro nuevo (USD) *</span>
+        <input type="number" id="lBase" step="0.5" min="0" value="${l.precioNuevoEst||''}" oninput="recalc()" placeholder="Ej: 18.00"></label>
+      <label class="f"><span>Precio mínimo que acepta el consignante <em>— opcional</em></span>
+        <input type="number" id="lMin" step="0.5" min="0" value="${l.precioMinimoCons||''}" oninput="recalc()"></label>
+    </div>
+    <div class="grid g2">
+      <label class="f"><span>Demanda del género</span><div class="pill-group">${pillas('lDem',{alta:'Alta',media:'Media',baja:'Baja'}, l.demanda)}</div></label>
+      <label class="f"><span>Antigüedad</span><div class="pill-group">${pillas('lAnt',{reciente:'Reciente',media:'3 a 10 años',antigua:'11 a 20 años',muy_antigua:'Más de 20'}, l.antiguedad)}</div></label>
+      <label class="f"><span>Edición</span><div class="pill-group">${pillas('lEdi',{especial:'Especial o tapa dura',comun:'Común',bolsillo:'Bolsillo'}, l.edicion)}</div></label>
+      <label class="f"><span>Rotación esperada</span><div class="pill-group">${pillas('lRot',{rapida:'Rápida',normal:'Normal',lenta:'Lenta'}, l.rotacion)}</div></label>
+    </div>
+    <div class="price-panel" id="pricePanel"></div>
+    <label class="f" style="margin-top:12px"><span>Precio final de venta <em>— puedes ajustarlo antes de enviarlo a aprobación</em></span>
+      <input type="number" id="lFinal" step="0.25" min="0" value="${l.precioFinal||''}" oninput="verSplit()"></label>
+    <div id="splitBox"></div>
+  `, [
+    {t:'Cancelar', c:'ghost', f:()=>{cerrarModal();}},
+    id ? {t:'Eliminar', c:'danger', f:()=>eliminarLibro(id)} : null,
+    {t: id?'Guardar cambios':'Guardar y seguir escaneando', f:()=>guardarLibro(id, consId, l)}
+  ].filter(Boolean));
+
+  pintarThumbs(); verPortada(); recalc();
+  if (l.precioFinal) $('#lFinal').value = l.precioFinal;
+}
+
+function autoDemanda(){ const cat = $('#lCat').value; const d = DEMANDA_POR_CAT[cat]; if (d){ const el = $('#lDem_'+d); if (el) el.checked = true; } recalc(); }
+function autoAntiguedad(){ const a = antiguedadPorAnio($('#lAnio').value); const el = $('#lAnt_'+a); if (el) el.checked = true; recalc(); }
+function radio(name){ const el = document.querySelector(`input[name="${name}"]:checked`); return el ? el.value : null; }
+function toggleRechazo(){ $('#wrapRech').classList.toggle('hide', $('#lAcep').checked); }
+function verPortada(){
+  const u = $('#lPort').value.trim();
+  $('#portPrev').innerHTML = u ? `<img src="${esc(u)}" class="cover" onerror="this.style.display='none'">` : '';
+}
+
+function recalc(){
+  const tmp = {
+    precioNuevoEst: parseFloat($('#lBase').value)||0,
+    estadoFisico: radio('lEst'), demanda: radio('lDem'),
+    antiguedad: radio('lAnt'), edicion: radio('lEdi'), rotacion: radio('lRot')
+  };
+  const r = calcularPrecio(tmp);
+  const minCons = parseFloat($('#lMin').value)||0;
+  const alerta = minCons > 0 && r.precio < minCons;
+  $('#pricePanel').innerHTML = `
+    <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
+      <div><div class="l" style="font-size:11px;color:var(--ink-3);font-weight:650;text-transform:uppercase;letter-spacing:.04em">Precio sugerido</div>
+        <div class="price-big">${money(r.precio)}</div></div>
+      <div class="spacer" style="flex:1"></div>
+      <button type="button" class="btn ghost sm" onclick="$('#lFinal').value=${r.precio.toFixed(2)};verSplit()">Usar este precio</button>
+    </div>
+    <div style="margin-top:12px">
+      <div class="calc-line"><span>Precio de referencia</span><b>${money(r.base)}</b></div>
+      <div class="calc-line"><span>Estado físico · ${ESTADOS_FISICOS[tmp.estadoFisico]||'—'}</span><b>× ${r.fe.toFixed(2)}</b></div>
+      <div class="calc-line"><span>Demanda del género</span><b>× ${r.fd.toFixed(2)}</b></div>
+      <div class="calc-line"><span>Antigüedad</span><b>× ${r.fa.toFixed(2)}</b></div>
+      <div class="calc-line"><span>Edición</span><b>× ${r.fi.toFixed(2)}</b></div>
+      <div class="calc-line"><span>Rotación esperada</span><b>× ${r.fr.toFixed(2)}</b></div>
+      <div class="calc-line"><span>Resultado antes de redondear</span><b>${money(r.bruto)}</b></div>
+    </div>
+    ${r.ajustadoAlMinimo?`<div class="note warn" style="margin:10px 0 0">Se subió al precio mínimo de venta de la librería (${money(S.cfg.precioMinimo)}).</div>`:''}
+    ${alerta?`<div class="note bad" style="margin:10px 0 0">El sugerido queda por debajo del mínimo que pide el consignante (${money(minCons)}). Conversa el precio antes de enviarlo.</div>`:''}
+  `;
+  if (!$('#lFinal').value) $('#lFinal').value = r.precio.toFixed(2);
+  verSplit();
+}
+
+function verSplit(){
+  const p = parseFloat($('#lFinal').value)||0;
+  const c = p * (S.cfg.pctConsignante/100), m = p * (S.cfg.pctLibreria/100);
+  $('#splitBox').innerHTML = p ? `<div class="price-split">
+      <div><span style="color:var(--ink-3);font-size:11px">Consignante ${S.cfg.pctConsignante}%</span><b style="color:var(--verde)">${money(c)}</b></div>
+      <div><span style="color:var(--ink-3);font-size:11px">La Madriguera ${S.cfg.pctLibreria}%</span><b style="color:var(--terra)">${money(m)}</b></div>
+    </div>` : '';
+}
+
+/* ---- fotos comprimidas a base64 (evita configurar Storage) ---- */
+function agregarFotos(input){
+  const files = Array.from(input.files||[]).slice(0, 3 - FOTOS_TMP.length);
+  files.forEach(f => {
+    const rd = new FileReader();
+    rd.onload = e => {
+      const img = new Image();
+      img.onload = () => {
+        const max = 620, s = Math.min(1, max/Math.max(img.width,img.height));
+        const cv = document.createElement('canvas');
+        cv.width = Math.round(img.width*s); cv.height = Math.round(img.height*s);
+        cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+        FOTOS_TMP.push(cv.toDataURL('image/jpeg', 0.62));
+        pintarThumbs();
+      };
+      img.src = e.target.result;
+    };
+    rd.readAsDataURL(f);
+  });
+  input.value = '';
+}
+function pintarThumbs(){
+  const el = $('#thumbs'); if(!el) return;
+  el.innerHTML = FOTOS_TMP.map((f,i)=>`<div class="th"><img src="${f}"><button type="button" onclick="quitarFoto(${i})">×</button></div>`).join('');
+}
+function quitarFoto(i){ FOTOS_TMP.splice(i,1); pintarThumbs(); }
+
+async function guardarLibro(id, consId, orig){
+  const c = consPorId(consId);
+  if (!c) return toast('Falta el consignante','err');
+  const titulo = $('#lTit').value.trim();
+  if (!titulo) return toast('El título es obligatorio','err');
+  const l = Object.assign({}, orig||{});
+  l.consignanteId = consId; l.consignanteNombre = nombreCons(c);
+  l.isbn = limpiarISBN($('#lIsbn').value);
+  l.titulo = titulo; l.autor = $('#lAut').value.trim(); l.editorial = $('#lEd').value.trim();
+  l.anio = $('#lAnio').value.trim(); l.categoria = $('#lCat').value;
+  l.descripcion = $('#lDesc').value.trim(); l.portadaUrl = $('#lPort').value.trim();
+  l.estadoFisico = radio('lEst'); l.demanda = radio('lDem'); l.antiguedad = radio('lAnt');
+  l.edicion = radio('lEdi'); l.rotacion = radio('lRot');
+  l.danios = $$('#lDanios input:checked').map(x=>x.value);
+  l.observaciones = $('#lObs').value.trim();
+  l.fotos = FOTOS_TMP.slice();
+  l.aceptado = $('#lAcep').checked;
+  l.motivoRechazo = l.aceptado ? '' : $('#lMot').value;
+  l.precioNuevoEst = parseFloat($('#lBase').value)||0;
+  l.precioMinimoCons = parseFloat($('#lMin').value)||0;
+  l.precioSugerido = calcularPrecio(l).precio;
+  l.precioFinal = parseFloat($('#lFinal').value) || l.precioSugerido;
+
+  if (!id){
+    l.codigo = await DB.siguienteCodigo('libros');
+    l.fechaIngreso = hoyISO();
+    l.fechaLimite = sumarDias(l.fechaIngreso, Number(S.cfg.plazoDias)||120);
+    l.creado = new Date().toISOString();
+    l.historial = [];
+  }
+  if (!l.aceptado) l.estado = 'rechazado';
+  else if (!l.estado || ['recibido','pendiente_revision','rechazado'].includes(l.estado)) l.estado = 'aceptado';
+
+  l.historial = (l.historial||[]).concat([{ f:new Date().toISOString(), e:l.estado, u:(S.user?S.user.email:'local') }]);
+
+  const saved = await DB.guardar(COL.libros, l);
+  const i = S.libros.findIndex(x=>x.id===saved.id);
+  if (i>=0) S.libros[i] = saved; else S.libros.push(saved);
+  if (!id && saved.aceptado) S.lote.push(saved.id);
+  cerrarModal(); pintarTodo();
+  toast(id ? 'Libro actualizado' : `${saved.codigo} · ${saved.titulo} guardado`, 'ok');
+  if (!id) setTimeout(()=>{ const el = $('#isbnIn'); if (el) el.focus(); }, 150);
+}
+
+async function eliminarLibro(id){
+  const l = libroPorId(id);
+  if (!confirm(`¿Eliminar definitivamente ${l.codigo} — ${l.titulo}? Esta acción no se puede deshacer.`)) return;
+  await DB.borrar(COL.libros, id);
+  S.libros = S.libros.filter(x=>x.id!==id);
+  S.lote = S.lote.filter(x=>x!==id);
+  cerrarModal(); pintarTodo(); toast('Libro eliminado');
+}
+
+/* ============================ INGRESO / LOTE ============================ */
+function pintarIngreso(){
+  llenarSelectCons('ingCons');
+  const ids = S.lote.filter(id => libroPorId(id));
+  S.lote = ids;
+  $('#loteCount').textContent = ids.length + (ids.length===1?' libro':' libros');
+  const tot = ids.reduce((s,id)=> s + (libroPorId(id).precioFinal||0), 0);
+  $('#loteLista').innerHTML = ids.length ? ids.map(id=>{
+    const l = libroPorId(id);
+    return `<div class="bookcard">
+      ${l.portadaUrl?`<img src="${esc(l.portadaUrl)}" onerror="this.outerHTML='<div class=&quot;cover ph&quot;>📕</div>'">`:'<div class="cover ph">📕</div>'}
+      <div class="info"><b>${esc(l.titulo)}</b>
+        <small>${esc(l.autor||'Autor no registrado')} · ${esc(l.editorial||'—')}</small><br>
+        <span class="tag t-gris">${l.codigo}</span>
+        <span class="tag t-azul">${ESTADOS_FISICOS[l.estadoFisico]}</span>
+        <span class="tag t-verde">${money(l.precioFinal)}</span>
+        <span class="tag ${SITUACIONES[l.estado].c}">${SITUACIONES[l.estado].t}</span></div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <button class="btn ghost sm" onclick="abrirLibro('${l.id}')">Editar</button>
+        <button class="btn ghost sm" onclick="sacarDelLote('${l.id}')">Quitar</button>
+      </div></div>`;
+  }).join('') + `<div class="row" style="margin-top:10px;justify-content:flex-end"><b>Total del lote: ${money(tot)}</b></div>`
+    : `<div class="empty"><b>El lote está vacío</b>Escanea el primer ISBN o usa el ingreso manual.</div>`;
+}
+function sacarDelLote(id){ S.lote = S.lote.filter(x=>x!==id); pintarIngreso(); }
+function limpiarLote(){ if (S.lote.length && !confirm('¿Cerrar el lote en curso? Los libros ya guardados se mantienen en el inventario.')) return; S.lote = []; pintarIngreso(); toast('Lote cerrado'); }
+function cambioConsignante(){
+  const id = $('#ingCons').value;
+  if (id && S.lote.length){
+    const distinto = S.lote.some(x => libroPorId(x) && libroPorId(x).consignanteId !== id);
+    if (distinto && confirm('El lote en curso es de otro consignante. ¿Cerrarlo y empezar uno nuevo?')) S.lote = [];
+  }
+  pintarIngreso();
+  const el = $('#isbnIn'); if (el && id) el.focus();
+}
+
+/* ============================ INVENTARIO ============================ */
+function pintarInventario(){
+  const selEst = $('#fInvEstado');
+  if (!selEst.options.length){
+    selEst.innerHTML = '<option value="">Todas las situaciones</option>' +
+      Object.entries(SITUACIONES).map(([k,v])=>`<option value="${k}">${v.t}</option>`).join('');
+    $('#fInvCat').innerHTML = '<option value="">Todas las categorías</option>' + CATEGORIAS.map(c=>`<option>${c}</option>`).join('');
+  }
+  llenarSelectCons('fInvCons', true);
+  const q = ($('#fInv').value||'').toLowerCase().trim();
+  const fe = selEst.value, fc = $('#fInvCons').value, fk = $('#fInvCat').value;
+  let lista = S.libros.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));
+  if (fe) lista = lista.filter(l=>l.estado===fe);
+  if (fc) lista = lista.filter(l=>l.consignanteId===fc);
+  if (fk) lista = lista.filter(l=>l.categoria===fk);
+  if (q) lista = lista.filter(l=>[l.titulo,l.autor,l.isbn,l.codigo,l.consignanteNombre,l.editorial].join(' ').toLowerCase().includes(q));
+
+  const tot = lista.reduce((s,l)=>s+(l.precioFinal||0),0);
+  $('#invResumen').textContent = `${lista.length} libro${lista.length===1?'':'s'} · valor de exhibición ${money(tot)}`;
+  $('#tbInv').innerHTML = lista.map(l=>{
+    const dias = l.fechaLimite ? diasEntre(hoyISO(), l.fechaLimite) : null;
+    const venceTxt = !l.fechaLimite ? '—'
+      : (['vendido','pagado','retirado','rechazado'].includes(l.estado) ? fmtFecha(l.fechaLimite)
+      : (dias < 0 ? `<span class="tag t-rojo">Vencido</span>` : dias <= 15 ? `<span class="tag t-oro">${dias} días</span>` : fmtFecha(l.fechaLimite)));
+    return `<tr>
+      <td><input type="checkbox" class="chkInv" value="${l.id}"></td>
+      <td class="mono">${esc(l.codigo)}</td>
+      <td><b>${esc(l.titulo)}</b><br><small style="color:var(--ink-3)">${esc(l.autor||'—')}${l.isbn?' · '+esc(l.isbn):''}</small></td>
+      <td>${esc(l.consignanteNombre||'—')}</td>
+      <td>${ESTADOS_FISICOS[l.estadoFisico]||'—'}</td>
+      <td><b>${money(l.precioFinal||l.precioSugerido)}</b></td>
+      <td><span class="tag ${SITUACIONES[l.estado].c}">${SITUACIONES[l.estado].t}</span></td>
+      <td>${venceTxt}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn ghost sm" onclick="abrirLibro('${l.id}')">Ficha</button>
+        <button class="btn ghost sm" onclick="menuEstado('${l.id}')">Estado</button>
+      </td></tr>`;
+  }).join('');
+  $('#emptyInv').innerHTML = lista.length ? '' :
+    `<div class="empty"><b>Sin libros con esos filtros</b>Cambia los filtros o ingresa libros nuevos desde la pestaña de ingreso.</div>`;
+}
+function marcarTodos(chk){ $$('.chkInv').forEach(c=>c.checked = chk.checked); }
+function seleccionados(){ return $$('.chkInv:checked').map(c=>c.value); }
+
+async function accionMasiva(accion){
+  if (accion === 'recalcular'){ const n = await recalcularVencidos(true); return toast(n?`${n} libro(s) marcados como vencidos`:'No hay libros vencidos nuevos','ok'); }
+  const ids = seleccionados();
+  if (!ids.length) return toast('Selecciona primero los libros en la tabla','err');
+  let n = 0;
+  for (const id of ids){
+    const l = libroPorId(id);
+    if (accion === 'publicado' && l.estado !== 'aprobado'){ continue; }
+    await cambiarEstado(id, accion, true); n++;
+  }
+  pintarTodo();
+  toast(n ? `${n} libro(s) actualizados` : 'Solo se publican libros con el precio aprobado', n?'ok':'err');
+}
+
+function menuEstado(id){
+  const l = libroPorId(id);
+  const opciones = Object.entries(SITUACIONES).map(([k,v])=>
+    `<button class="btn ${l.estado===k?'':'ghost'} sm" style="margin:3px" onclick="cambiarEstado('${id}','${k}')">${v.t}</button>`).join('');
+  modal('Situación de ' + l.codigo, `
+    <p class="sub" style="margin-bottom:12px">${esc(l.titulo)} — ${esc(l.consignanteNombre)}</p>
+    <div class="note info">Flujo normal: recibido → aceptado → pendiente de aprobación → aprobado → publicado → vendido → pagado.</div>
+    <div>${opciones}</div>
+    <h4 style="margin:16px 0 8px;font-size:13px">Historial</h4>
+    <div class="tw"><table><tbody>${(l.historial||[]).slice().reverse().map(h=>
+      `<tr><td>${fmtFechaHora(h.f)}</td><td><span class="tag ${(SITUACIONES[h.e]||{c:'t-gris'}).c}">${(SITUACIONES[h.e]||{t:h.e}).t}</span></td><td class="sub">${esc(h.u||'')}</td></tr>`).join('')
+      || '<tr><td class="sub">Sin movimientos.</td></tr>'}</tbody></table></div>
+  `, [{t:'Cerrar', c:'ghost', f:cerrarModal}]);
+}
+
+async function cambiarEstado(id, nuevo, silencioso){
+  const l = Object.assign({}, libroPorId(id));
+  if (nuevo === 'vendido' && !l.venta) return abrirVenta(id);
+  if (nuevo === 'pagado' && l.estado !== 'vendido' && !l.venta) { if (!silencioso) toast('Primero registra la venta','err'); return; }
+  l.estado = nuevo;
+  if (nuevo === 'pagado') l.pago = Object.assign({ fecha:new Date().toISOString(), metodo:(consPorId(l.consignanteId)||{}).formaPago||'efectivo' }, l.pago||{});
+  l.historial = (l.historial||[]).concat([{ f:new Date().toISOString(), e:nuevo, u:(S.user?S.user.email:'local') }]);
+  const saved = await DB.guardar(COL.libros, l);
+  S.libros[S.libros.findIndex(x=>x.id===id)] = saved;
+  if (!silencioso){ cerrarModal(); pintarTodo(); toast('Situación actualizada','ok'); }
+}
+
+async function recalcularVencidos(guardar){
+  let n = 0;
+  for (const l of S.libros){
+    if (!l.fechaLimite) continue;
+    if (['aprobado','publicado'].includes(l.estado) && diasEntre(hoyISO(), l.fechaLimite) < 0){
+      l.estado = 'vencido';
+      l.historial = (l.historial||[]).concat([{ f:new Date().toISOString(), e:'vencido', u:'sistema' }]);
+      n++;
+      if (guardar) await DB.guardar(COL.libros, l);
+    }
+  }
+  if (n && guardar) pintarTodo();
+  return n;
+}
+
+/* ============================ APROBACIÓN DE PRECIOS ============================ */
+async function enviarAAprobacion(){
+  const consId = $('#ingCons').value;
+  if (!consId) return toast('Selecciona el consignante','err');
+  const c = consPorId(consId);
+  const libros = S.libros.filter(l => l.consignanteId === consId && l.aceptado &&
+    ['aceptado','pendiente_aprobacion'].includes(l.estado));
+  if (!libros.length) return toast('No hay libros aceptados pendientes de enviar','err');
+  await crearAprobacion(consId, libros);
+}
+
+async function crearAprobacion(consId, libros){
+  const c = consPorId(consId);
+  const token = uid() + Math.random().toString(36).slice(2,8);
+  const ap = {
+    id: token, token, consignanteId: consId, consignanteNombre: nombreCons(c),
+    creado: new Date().toISOString(), estado: 'pendiente', sincronizado: false,
+    condiciones: { pctCons:S.cfg.pctConsignante, pctLib:S.cfg.pctLibreria, plazo:S.cfg.plazoDias, libreria:S.cfg.nombre },
+    items: libros.map(l => ({
+      libroId:l.id, codigo:l.codigo, titulo:l.titulo, autor:l.autor||'', editorial:l.editorial||'',
+      estadoFisico:l.estadoFisico, observaciones:l.observaciones||'', portada:l.portadaUrl||'',
+      foto:(l.fotos&&l.fotos[0])||'', precio:Number(l.precioFinal||l.precioSugerido||0),
+      decision:'pendiente', fecha:null, comentario:''
+    }))
+  };
+  const saved = await DB.guardar(COL.aprob, ap);
+  S.aprob.push(saved);
+  for (const l of libros){ if (l.estado !== 'pendiente_aprobacion') await cambiarEstado(l.id, 'pendiente_aprobacion', true); }
+  pintarTodo(); irA('aprobaciones');
+  mostrarEnlace(saved.id);
+}
+
+function urlAprobacion(token){
+  const base = (S.cfg.urlPublica || '').trim() || (location.origin + location.pathname);
+  return base.replace(/#.*$/,'') + '#/aprobar/' + token;
+}
+
+function mostrarEnlace(id){
+  const ap = S.aprob.find(a=>a.id===id); if(!ap) return;
+  const url = urlAprobacion(ap.token);
+  const c = consPorId(ap.consignanteId) || {};
+  const total = ap.items.reduce((s,i)=>s+i.precio,0);
+  const msg = `Hola ${(c.nombres||'').split(' ')[0]}, ya revisamos tus libros para Segunda Vida en La Madriguera 🌿
+Te dejamos aquí el detalle con el precio sugerido de cada uno para que lo apruebes o nos digas si prefieres ajustarlo:
+${url}
+Recuerda: si el libro se vende recibes el ${S.cfg.pctConsignante}% del precio, y la exhibición es de ${S.cfg.plazoDias} días.`;
+  modal('Enlace de aprobación', `
+    <p class="sub" style="margin-bottom:12px">${esc(ap.consignanteNombre)} · ${ap.items.length} libro(s) · total ${money(total)}</p>
+    ${S.cfg.urlPublica ? '' : '<div class="note warn">Para enviar el enlace por WhatsApp, primero guarda en Ajustes la dirección web donde publicaste la app. Mientras tanto, puedes abrirlo aquí mismo en tienda.</div>'}
+    <label class="f"><span>Enlace</span><input type="text" class="mono" value="${esc(url)}" onclick="this.select()" readonly></label>
+    <label class="f"><span>Mensaje listo para WhatsApp o Instagram</span><textarea style="min-height:130px" id="msgWa" readonly>${esc(msg)}</textarea></label>
+  `, [
+    {t:'Cerrar', c:'ghost', f:cerrarModal},
+    {t:'Copiar mensaje', c:'ghost', f:()=>{ navigator.clipboard.writeText(msg).then(()=>toast('Mensaje copiado','ok')); }},
+    {t:'Abrir en tienda', f:()=>{ cerrarModal(); location.hash = '#/aprobar/' + ap.token; location.reload(); }}
+  ]);
+}
+
+function pintarAprobaciones(){
+  const lista = S.aprob.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));
+  $('#listaAprob').innerHTML = lista.length ? lista.map(ap=>{
+    const ok = ap.items.filter(i=>i.decision==='aprobado').length;
+    const no = ap.items.filter(i=>i.decision==='rechazado').length;
+    const pe = ap.items.filter(i=>i.decision==='pendiente').length;
+    const total = ap.items.reduce((s,i)=>s+i.precio,0);
+    return `<div class="card">
+      <div class="hd" style="margin-bottom:10px">
+        <div><h3>${esc(ap.consignanteNombre)}</h3>
+          <p class="sub">Enviado el ${fmtFechaHora(ap.creado)} · ${ap.items.length} libro(s) · ${money(total)}</p></div>
+        <div class="spacer"></div>
+        <span class="tag ${pe? 't-oro':'t-verde'}">${pe? pe+' pendiente(s)':'Completa'}</span>
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <span class="tag t-verde">${ok} aprobado(s)</span>
+        <span class="tag t-rojo">${no} rechazado(s)</span>
+        <span class="tag t-gris">${pe} sin responder</span>
+      </div>
+      <div class="tw"><table><thead><tr><th>Código</th><th>Libro</th><th>Precio</th><th>Decisión</th><th>Fecha y hora</th><th>Comentario</th></tr></thead><tbody>
+        ${ap.items.map(i=>`<tr><td class="mono">${esc(i.codigo)}</td><td>${esc(i.titulo)}</td><td>${money(i.precio)}</td>
+          <td><span class="tag ${i.decision==='aprobado'?'t-verde':i.decision==='rechazado'?'t-rojo':'t-gris'}">${i.decision==='pendiente'?'Sin responder':i.decision==='aprobado'?'Aprobado':'Rechazado'}</span></td>
+          <td class="sub">${i.fecha?fmtFechaHora(i.fecha):'—'}</td><td class="sub">${esc(i.comentario||'')}</td></tr>`).join('')}
+      </tbody></table></div>
+      <div class="row" style="margin-top:11px">
+        <button class="btn ghost sm" onclick="mostrarEnlace('${ap.id}')">Ver enlace y mensaje</button>
+        <button class="btn ghost sm" onclick="location.hash='#/aprobar/${ap.token}';location.reload()">Abrir en tienda</button>
+        <button class="btn ghost sm" onclick="sincronizarAprobaciones(true)">Actualizar decisiones</button>
+      </div>
+    </div>`;
+  }).join('') : `<div class="empty"><b>Todavía no hay lotes en aprobación</b>Desde el ingreso de libros, pulsa “Enviar precios a aprobación”.</div>`;
+}
+
+/* Aplica al inventario las decisiones que el consignante dejó en el enlace público */
+async function sincronizarAprobaciones(avisar){
+  let cambios = 0;
+  try{
+    if (avisar) S.aprob = await DB.lista(COL.aprob);
+    for (const ap of S.aprob){
+      for (const it of (ap.items||[])){
+        if (it.decision === 'pendiente') continue;
+        const l = libroPorId(it.libroId);
+        if (!l) continue;
+        const destino = it.decision === 'aprobado' ? 'aprobado' : 'rechazado';
+        if (l.estado === 'pendiente_aprobacion'){
+          l.aprobacion = { decision:it.decision, fecha:it.fecha, canal:it.canal||'enlace', comentario:it.comentario||'' };
+          if (it.decision === 'rechazado') l.motivoRechazo = 'Precio no aprobado por el consignante';
+          l.estado = destino;
+          l.historial = (l.historial||[]).concat([{ f:it.fecha||new Date().toISOString(), e:destino, u:'consignante' }]);
+          await DB.guardar(COL.libros, l);
+          cambios++;
+        }
+      }
+      const pend = (ap.items||[]).some(i=>i.decision==='pendiente');
+      if (!pend && ap.estado !== 'completa'){ ap.estado = 'completa'; await DB.guardar(COL.aprob, ap); }
+    }
+  }catch(e){ if (avisar) toast('No se pudieron sincronizar: ' + e.message,'err'); }
+  if (avisar){ pintarTodo(); toast(cambios?`${cambios} libro(s) actualizados`:'Todo al día','ok'); }
+  return cambios;
+}
+
+/* ============================ VISTA PÚBLICA DEL CONSIGNANTE ============================ */
+let PUB = null;
+
+async function arrancarVistaPublica(token){
+  $('#pubView').classList.remove('hide');
+  $('#pubBody').innerHTML = '<div class="empty">Cargando tus libros…</div>';
+  const modo = localStorage.getItem(LS.modo);
+  if (modo === 'local'){ S.modo = 'local'; }
+  else {
+    const cfg = FIREBASE_CONFIG_FIJA || leerCfgGuardada();
+    if (!cfg){ $('#pubBody').innerHTML = '<div class="empty"><b>Enlace no disponible</b>Pide a La Madriguera que te reenvíe el enlace.</div>'; return; }
+    try{
+      if (!firebase.apps.length) firebase.initializeApp(cfg);
+      S.db = firebase.firestore(); S.modo = 'nube';
+    }catch(e){ $('#pubBody').innerHTML = '<div class="empty"><b>No se pudo abrir el enlace</b>' + esc(e.message) + '</div>'; return; }
+  }
+  try{
+    const ap = await DB.obtener(COL.aprob, token);
+    if (!ap){ $('#pubBody').innerHTML = '<div class="empty"><b>Este enlace ya no está disponible</b>Escríbenos por Instagram y te enviamos uno nuevo.</div>'; return; }
+    PUB = ap;
+    S.cfg = Object.assign({}, CFG_DEF, { pctConsignante:(ap.condiciones||{}).pctCons||70, pctLibreria:(ap.condiciones||{}).pctLib||30, plazoDias:(ap.condiciones||{}).plazo||120 });
+    pintarPublica();
+  }catch(e){
+    $('#pubBody').innerHTML = '<div class="empty"><b>No se pudo leer el enlace</b>' + esc(e.message) + '</div>';
+  }
+}
+
+function pintarPublica(){
+  const ap = PUB;
+  const nombre = (ap.consignanteNombre||'').split(' ')[0];
+  const decididos = ap.items.filter(i=>i.decision!=='pendiente').length;
+  const aprobados = ap.items.filter(i=>i.decision==='aprobado');
+  const totalAprob = aprobados.reduce((s,i)=>s+i.precio,0);
+  const tuyo = totalAprob * (S.cfg.pctConsignante/100);
+
+  $('#pubBody').innerHTML = `
+    <div class="pub-hero">
+      <div class="eyebrow">Segunda Vida</div>
+      <h1>${esc(nombre?('Hola, '+nombre):'Tus libros')} 🌿</h1>
+      <p>Estos son los libros que recibimos y el precio de venta que proponemos para cada uno.
+      Si el libro se vende recibes el <b>${S.cfg.pctConsignante}%</b> de ese precio, y la exhibición dura <b>${S.cfg.plazoDias} días</b>.
+      Aprueba los que estés de acuerdo. Si alguno no te convence, márcalo y déjanos tu comentario: lo conversamos.</p>
+    </div>
+    ${ap.estado==='completa' ? '<div class="note ok">Ya registramos todas tus respuestas. Gracias.</div>' : ''}
+    ${ap.items.map((i,ix)=>`
+      <div class="pub-book ${i.decision==='aprobado'?'ok':i.decision==='rechazado'?'no':''}">
+        <div style="display:flex;gap:12px">
+          ${(i.foto||i.portada)?`<img src="${esc(i.foto||i.portada)}" class="cover" style="width:60px;height:88px" onerror="this.style.display='none'">`:'<div class="cover ph" style="width:60px;height:88px">📕</div>'}
+          <div style="flex:1;min-width:0">
+            <b style="font-size:14.5px;display:block;line-height:1.35">${esc(i.titulo)}</b>
+            <small style="color:var(--ink-3)">${esc(i.autor||'')}${i.editorial?' · '+esc(i.editorial):''}</small>
+            <div style="margin-top:6px"><span class="tag t-gris">Estado: ${ESTADOS_FISICOS[i.estadoFisico]||'—'}</span></div>
+            ${i.observaciones?`<p class="sub" style="margin-top:6px">${esc(i.observaciones)}</p>`:''}
+            <div style="margin-top:9px;display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
+              <div><div style="font-size:11px;color:var(--ink-3);font-weight:650;text-transform:uppercase">Precio de venta</div>
+                <div style="font-size:23px;font-weight:700;color:var(--verde);line-height:1.1">${money(i.precio)}</div></div>
+              <div><div style="font-size:11px;color:var(--ink-3);font-weight:650;text-transform:uppercase">Recibes tú</div>
+                <div style="font-size:17px;font-weight:650">${money(i.precio*S.cfg.pctConsignante/100)}</div></div>
+            </div>
+          </div>
+        </div>
+        ${i.decision==='pendiente' ? `
+          <div class="pub-actions">
+            <button class="btn" onclick="decidir(${ix},'aprobado')">Apruebo este precio</button>
+            <button class="btn ghost" onclick="decidir(${ix},'rechazado')">No estoy de acuerdo</button>
+          </div>` : `
+          <div class="row" style="margin-top:10px">
+            <span class="tag ${i.decision==='aprobado'?'t-verde':'t-rojo'}">${i.decision==='aprobado'?'Aprobado':'No aprobado'}</span>
+            <span class="sub">${fmtFechaHora(i.fecha)}</span>
+            ${i.comentario?`<span class="sub">· ${esc(i.comentario)}</span>`:''}
+            <div class="spacer" style="flex:1"></div>
+            <button class="btn ghost sm" onclick="decidir(${ix},'pendiente')">Cambiar</button>
+          </div>`}
+      </div>`).join('')}
+    <div class="card" style="margin-top:16px">
+      <h3>Resumen</h3>
+      <div class="calc-line"><span>Libros aprobados</span><b>${aprobados.length} de ${ap.items.length}</b></div>
+      <div class="calc-line"><span>Precio total de venta</span><b>${money(totalAprob)}</b></div>
+      <div class="calc-line"><span>Tu ${S.cfg.pctConsignante}% si se venden todos</span><b style="color:var(--verde)">${money(tuyo)}</b></div>
+      <p class="sub" style="margin-top:10px">El pago se realiza dentro de los primeros 5 días hábiles del mes siguiente a la venta, en efectivo o transferencia. Los libros que no se vendan en ${S.cfg.plazoDias} días se coordinan para retiro o extensión del plazo.</p>
+    </div>
+  `;
+  const falta = ap.items.filter(i=>i.decision==='pendiente').length;
+  document.querySelectorAll('.sticky-bar').forEach(e=>e.remove());
+  const bar = document.createElement('div');
+  bar.className = 'sticky-bar';
+  bar.innerHTML = `<div class="in">
+    <div style="flex:1"><b style="font-size:13.5px">${decididos} de ${ap.items.length} respondidos</b>
+      <div class="sub">${falta?('Faltan '+falta+' por responder'):'Ya respondiste todos. ¡Gracias!'}</div></div>
+    <button class="btn" onclick="enviarDecisiones()" ${falta===ap.items.length?'disabled':''}>Enviar respuestas</button></div>`;
+  document.body.appendChild(bar);
+}
+
+function decidir(ix, decision){
+  const it = PUB.items[ix];
+  if (decision === 'pendiente'){ it.decision='pendiente'; it.fecha=null; it.comentario=''; return pintarPublica(); }
+  if (decision === 'rechazado'){
+    const c = prompt('¿Qué precio te parecería justo, o por qué no estás de acuerdo? (opcional)');
+    it.comentario = c || '';
+  }
+  it.decision = decision;
+  it.fecha = new Date().toISOString();
+  it.canal = 'enlace';
+  pintarPublica();
+  guardarDecisiones(true);
+}
+
+async function guardarDecisiones(silencioso){
+  try{
+    const pend = PUB.items.some(i=>i.decision==='pendiente');
+    PUB.estado = pend ? 'pendiente' : 'completa';
+    PUB.actualizadoConsignante = new Date().toISOString();
+    await DB.guardar(COL.aprob, PUB);
+    if (!silencioso) toast('Respuestas enviadas. ¡Gracias!','ok');
+    return true;
+  }catch(e){ toast('No se pudieron guardar: ' + e.message,'err'); return false; }
+}
+async function enviarDecisiones(){
+  const ok = await guardarDecisiones(false);
+  if (ok){
+    const aprob = PUB.items.filter(i=>i.decision==='aprobado').length;
+    $('#pubBody').innerHTML = `<div class="pub-hero"><div class="eyebrow">Segunda Vida</div>
+      <h1>¡Listo, gracias! 🌿</h1>
+      <p>Registramos tus respuestas: ${aprob} libro(s) aprobados. Preparamos tu contrato y los libros pasan a exhibición en La Madriguera.
+      Te avisamos por WhatsApp cuando se vendan.</p></div>`;
+    document.querySelectorAll('.sticky-bar').forEach(e=>e.remove());
+  }
+}
+
+/* ============================ VENTAS Y PAGOS ============================ */
+function pintarVentas(){
+  const vendidos = S.libros.filter(l=>['vendido','pagado'].includes(l.estado));
+  const porPagar = S.libros.filter(l=>l.estado==='vendido');
+  const totalVenta = vendidos.reduce((s,l)=>s+(l.venta?l.venta.precioVenta:0),0);
+  const utilidad = vendidos.reduce((s,l)=>s+(l.venta?l.venta.montoLibreria:0),0);
+  const deuda = porPagar.reduce((s,l)=>s+(l.venta?l.venta.montoConsignante:0),0);
+  $('#kpisVentas').innerHTML = `
+    ${kpi(vendidos.length,'Libros vendidos','v')}
+    ${kpi(money(totalVenta),'Venta acumulada','')}
+    ${kpi(money(utilidad),'Utilidad La Madriguera '+S.cfg.pctLibreria+'%','o')}
+    ${kpi(money(deuda),'Por pagar a consignantes','t')}`;
+
+  const porCons = {};
+  porPagar.forEach(l=>{
+    porCons[l.consignanteId] = porCons[l.consignanteId] || { libros:[], venta:0, cons:0, lib:0 };
+    const g = porCons[l.consignanteId];
+    g.libros.push(l); g.venta += l.venta.precioVenta; g.cons += l.venta.montoConsignante; g.lib += l.venta.montoLibreria;
+  });
+  const filas = Object.entries(porCons);
+  $('#tbLiq').innerHTML = filas.map(([id,g])=>{
+    const c = consPorId(id) || {};
+    return `<tr><td><b>${esc(nombreCons(c))}</b><br><small style="color:var(--ink-3)">${esc(c.telefono||'')}</small></td>
+      <td>${g.libros.length}</td><td>${money(g.venta)}</td>
+      <td><b style="color:var(--verde)">${money(g.cons)}</b></td><td>${money(g.lib)}</td>
+      <td>${esc(c.formaPago||'—')}${c.datosPago?'<br><small style="color:var(--ink-3)">'+esc(c.datosPago)+'</small>':''}</td>
+      <td style="text-align:right"><button class="btn sm" onclick="liquidar('${id}')">Registrar pago</button></td></tr>`;
+  }).join('');
+  $('#emptyLiq').innerHTML = filas.length ? '' : `<div class="empty"><b>No hay pagos pendientes</b>Cuando registres una venta, aquí aparece cuánto le toca a cada consignante.</div>`;
+}
+
+function registrarVentaRapida(){
+  const raw = $('#ventaBusca').value.trim().toUpperCase();
+  if (!raw) return;
+  const isbn = limpiarISBN(raw);
+  const cand = S.libros.filter(l =>
+    ((isbn.length >= 10 && limpiarISBN(l.isbn) === isbn) || (l.codigo||'').toUpperCase() === raw) &&
+    ['aprobado','publicado','vencido'].includes(l.estado));
+  $('#ventaBusca').value = '';
+  if (!cand.length) return toast('No se encontró un libro disponible con ese código o ISBN','err');
+  if (cand.length === 1) return abrirVenta(cand[0].id);
+  modal('Varios ejemplares', cand.map(l=>`<button class="btn ghost wide" style="margin-bottom:6px" onclick="cerrarModal();abrirVenta('${l.id}')">${esc(l.codigo)} · ${esc(l.titulo)} · ${esc(l.consignanteNombre)} · ${money(l.precioFinal)}</button>`).join(''), [{t:'Cancelar',c:'ghost',f:cerrarModal}]);
+}
+
+function abrirVenta(id){
+  const l = libroPorId(id);
+  modal('Registrar venta', `
+    <div class="bookcard"><div class="cover ph">📕</div><div class="info"><b>${esc(l.titulo)}</b>
+      <small>${esc(l.autor||'')} · ${esc(l.consignanteNombre)}</small><br><span class="tag t-gris">${esc(l.codigo)}</span></div></div>
+    <div class="grid g2">
+      <label class="f"><span>Precio de venta real (USD)</span><input type="number" id="vPrecio" step="0.25" value="${(l.precioFinal||0).toFixed(2)}" oninput="vistaSplitVenta()"></label>
+      <label class="f"><span>Fecha de venta</span><input type="date" id="vFecha" value="${hoyISO()}"></label>
+      <label class="f"><span>Forma de pago del cliente</span><select id="vMetodo"><option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option><option>Mixto</option></select></label>
+      <label class="f"><span>Nota <em>— opcional</em></span><input type="text" id="vNota"></label>
+    </div>
+    <div id="splitVenta"></div>
+  `, [{t:'Cancelar',c:'ghost',f:cerrarModal},{t:'Registrar venta',f:()=>confirmarVenta(id)}]);
+  vistaSplitVenta();
+}
+function vistaSplitVenta(){
+  const p = parseFloat($('#vPrecio').value)||0;
+  $('#splitVenta').innerHTML = `<div class="price-split">
+    <div><span style="color:var(--ink-3);font-size:11px">Consignante ${S.cfg.pctConsignante}%</span><b style="color:var(--verde)">${money(p*S.cfg.pctConsignante/100)}</b></div>
+    <div><span style="color:var(--ink-3);font-size:11px">La Madriguera ${S.cfg.pctLibreria}%</span><b style="color:var(--terra)">${money(p*S.cfg.pctLibreria/100)}</b></div></div>`;
+}
+async function confirmarVenta(id){
+  const l = Object.assign({}, libroPorId(id));
+  const p = parseFloat($('#vPrecio').value)||0;
+  if (p <= 0) return toast('Ingresa el precio de venta','err');
+  l.venta = { fecha:$('#vFecha').value, precioVenta:p,
+    montoConsignante: Math.round(p*S.cfg.pctConsignante)/100,
+    montoLibreria: Math.round(p*S.cfg.pctLibreria)/100,
+    metodoPago:$('#vMetodo').value, nota:$('#vNota').value.trim(), registradoPor:(S.user?S.user.email:'local') };
+  l.estado = 'vendido';
+  l.historial = (l.historial||[]).concat([{ f:new Date().toISOString(), e:'vendido', u:(S.user?S.user.email:'local') }]);
+  const saved = await DB.guardar(COL.libros, l);
+  S.libros[S.libros.findIndex(x=>x.id===id)] = saved;
+  cerrarModal(); pintarTodo(); toast(`Venta registrada · ${money(l.venta.montoConsignante)} para ${l.consignanteNombre}`,'ok');
+}
+
+function liquidar(consId){
+  const c = consPorId(consId);
+  const libros = S.libros.filter(l=>l.consignanteId===consId && l.estado==='vendido');
+  const total = libros.reduce((s,l)=>s+l.venta.montoConsignante,0);
+  modal('Liquidar a ' + nombreCons(c), `
+    <div class="note info">Se marcarán como pagados ${libros.length} libro(s) por un total de <b>${money(total)}</b>.</div>
+    <div class="tw"><table><thead><tr><th>Código</th><th>Libro</th><th>Vendido</th><th>Precio</th><th>${S.cfg.pctConsignante}%</th></tr></thead><tbody>
+      ${libros.map(l=>`<tr><td class="mono">${esc(l.codigo)}</td><td>${esc(l.titulo)}</td><td>${fmtFecha(l.venta.fecha)}</td><td>${money(l.venta.precioVenta)}</td><td><b>${money(l.venta.montoConsignante)}</b></td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="grid g2" style="margin-top:12px">
+      <label class="f"><span>Forma de pago</span><select id="liqMetodo">
+        <option ${c.formaPago==='efectivo'?'selected':''}>Efectivo</option>
+        <option ${c.formaPago==='transferencia'?'selected':''}>Transferencia</option>
+        <option ${c.formaPago==='credito'?'selected':''}>Crédito de tienda</option></select></label>
+      <label class="f"><span>Referencia o comprobante</span><input type="text" id="liqRef"></label>
+    </div>
+  `, [{t:'Cancelar',c:'ghost',f:cerrarModal},{t:'Confirmar pago',f:async()=>{
+    const metodo = $('#liqMetodo').value, ref = $('#liqRef').value.trim();
+    for (const l of libros){
+      const o = Object.assign({}, l);
+      o.pago = { fecha:new Date().toISOString(), metodo, referencia:ref, monto:o.venta.montoConsignante, registradoPor:(S.user?S.user.email:'local') };
+      o.estado = 'pagado';
+      o.historial = (o.historial||[]).concat([{ f:new Date().toISOString(), e:'pagado', u:(S.user?S.user.email:'local') }]);
+      const saved = await DB.guardar(COL.libros, o);
+      S.libros[S.libros.findIndex(x=>x.id===o.id)] = saved;
+    }
+    cerrarModal(); pintarTodo(); toast('Pago registrado · ' + money(total),'ok');
+  }}]);
+}
+
+/* ============================ PANEL ============================ */
+function kpi(n,l,c){ return `<div class="kpi ${c||''}"><div class="n">${n}</div><div class="l">${l}</div></div>`; }
+
+function pintarPanel(){
+  const L = S.libros;
+  const cnt = e => L.filter(l=>l.estado===e).length;
+  const activos = S.cons.filter(c => L.some(l=>l.consignanteId===c.id && !['pagado','retirado','rechazado'].includes(l.estado))).length;
+  const porPagar = L.filter(l=>l.estado==='vendido').reduce((s,l)=>s+(l.venta?l.venta.montoConsignante:0),0);
+  const utilidad = L.filter(l=>['vendido','pagado'].includes(l.estado)).reduce((s,l)=>s+(l.venta?l.venta.montoLibreria:0),0);
+  const proximos = L.filter(l=>['aprobado','publicado'].includes(l.estado) && l.fechaLimite && diasEntre(hoyISO(),l.fechaLimite) >= 0 && diasEntre(hoyISO(),l.fechaLimite) <= 30);
+
+  $('#panelFecha').textContent = new Date().toLocaleDateString('es-EC',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  $('#kpis').innerHTML = [
+    kpi(activos,'Consignantes activos','v'),
+    kpi(L.length,'Libros recibidos',''),
+    kpi(L.filter(l=>l.aceptado!==false).length,'Aceptados','v'),
+    kpi(cnt('rechazado'),'Rechazados','r'),
+    kpi(cnt('pendiente_aprobacion'),'Esperan aprobación','o'),
+    kpi(cnt('publicado'),'Publicados','v'),
+    kpi(cnt('vendido')+cnt('pagado'),'Vendidos','t'),
+    kpi(money(porPagar),'Pagos pendientes','t'),
+    kpi(proximos.length,'Vencen en 30 días','o'),
+    kpi(cnt('vencido'),'Vencidos','r'),
+    kpi(money(utilidad),'Utilidad La Madriguera','v'),
+    kpi(money(L.filter(l=>['aprobado','publicado'].includes(l.estado)).reduce((s,l)=>s+(l.precioFinal||0),0)),'Valor en exhibición','')
+  ].join('');
+
+  const alertas = [];
+  if (cnt('pendiente_revision')) alertas.push(['t-gris', cnt('pendiente_revision')+' libro(s) sin revisar', 'inventario']);
+  if (cnt('aceptado')) alertas.push(['t-azul', cnt('aceptado')+' libro(s) aceptados sin enviar a aprobación', 'ingreso']);
+  if (cnt('pendiente_aprobacion')) alertas.push(['t-oro', cnt('pendiente_aprobacion')+' libro(s) esperando respuesta del consignante', 'aprobaciones']);
+  if (cnt('aprobado')) alertas.push(['t-verde', cnt('aprobado')+' libro(s) aprobados listos para publicar', 'inventario']);
+  if (porPagar > 0) alertas.push(['t-terra', money(porPagar)+' por liquidar a consignantes', 'ventas']);
+  if (cnt('vencido')) alertas.push(['t-rojo', cnt('vencido')+' libro(s) vencidos: avisar para retiro o extensión', 'inventario']);
+  const sinTerm = S.cons.filter(c=>!c.aceptaTerminos).length;
+  if (sinTerm) alertas.push(['t-rojo', sinTerm+' consignante(s) sin aceptar términos', 'consignantes']);
+  $('#panelAlertas').innerHTML = alertas.length ? alertas.map(([c,t,p])=>
+    `<div class="row" style="padding:8px 0;border-bottom:1px solid var(--surface-2)">
+      <span class="tag ${c}">●</span><span style="flex:1;font-size:13px">${t}</span>
+      <button class="btn ghost sm" onclick="irA('${p}')">Ir</button></div>`).join('')
+    : '<p class="sub">Todo en orden. No hay nada pendiente.</p>';
+
+  const ult = L.slice().sort((a,b)=>(b.actualizado||b.creado||'').localeCompare(a.actualizado||a.creado||'')).slice(0,7);
+  $('#panelUltimos').innerHTML = ult.length ? ult.map(l=>
+    `<div class="row" style="padding:7px 0;border-bottom:1px solid var(--surface-2)">
+      <div style="flex:1;min-width:0"><b style="font-size:13px">${esc(l.titulo)}</b>
+        <div class="sub">${esc(l.consignanteNombre||'')} · ${fmtFechaHora(l.actualizado||l.creado)}</div></div>
+      <span class="tag ${SITUACIONES[l.estado].c}">${SITUACIONES[l.estado].t}</span></div>`).join('')
+    : '<p class="sub">Sin movimientos todavía.</p>';
+
+  $('#panelVence').innerHTML = proximos.length ? `<div class="tw"><table><thead><tr><th>Código</th><th>Libro</th><th>Consignante</th><th>Contacto</th><th>Vence</th><th>Faltan</th></tr></thead><tbody>
+    ${proximos.sort((a,b)=>a.fechaLimite.localeCompare(b.fechaLimite)).map(l=>{
+      const c = consPorId(l.consignanteId)||{};
+      return `<tr><td class="mono">${esc(l.codigo)}</td><td>${esc(l.titulo)}</td><td>${esc(l.consignanteNombre||'')}</td>
+        <td>${esc(c.telefono||'—')}</td><td>${fmtFecha(l.fechaLimite)}</td>
+        <td><span class="tag ${diasEntre(hoyISO(),l.fechaLimite)<=15?'t-oro':'t-gris'}">${diasEntre(hoyISO(),l.fechaLimite)} días</span></td></tr>`;
+    }).join('')}</tbody></table></div>`
+    : '<p class="sub">Ningún libro vence en los próximos 30 días.</p>';
+}
+
+/* ============================ REPORTES ============================ */
+function pintarReportes(){
+  const dias = parseInt($('#repRango').value,10);
+  const consId = $('#repCons').value;
+  const desde = dias ? sumarDias(hoyISO(), -dias) : '0000-01-01';
+  let L = S.libros.filter(l => (l.fechaIngreso||'0000-01-01') >= desde || (l.venta && l.venta.fecha >= desde));
+  if (consId) L = L.filter(l=>l.consignanteId===consId);
+
+  const vend = L.filter(l=>['vendido','pagado'].includes(l.estado));
+  const recibidos = L.length;
+  const rot = recibidos ? (vend.length/recibidos*100) : 0;
+  const ticket = vend.length ? vend.reduce((s,l)=>s+l.venta.precioVenta,0)/vend.length : 0;
+  const diasVenta = vend.filter(l=>l.venta&&l.venta.fecha&&l.fechaIngreso).map(l=>diasEntre(l.fechaIngreso,l.venta.fecha));
+  const promDias = diasVenta.length ? Math.round(diasVenta.reduce((a,b)=>a+b,0)/diasVenta.length) : 0;
+
+  const porCat = {}; vend.forEach(l=>{ const k=l.categoria||'Sin categoría'; porCat[k]=porCat[k]||{n:0,v:0}; porCat[k].n++; porCat[k].v+=l.venta.precioVenta; });
+  const catOrden = Object.entries(porCat).sort((a,b)=>b[1].n-a[1].n);
+  const porConsR = {}; L.forEach(l=>{ const k=l.consignanteNombre||'—'; porConsR[k]=porConsR[k]||{rec:0,ven:0,val:0,pag:0};
+    porConsR[k].rec++; if(['vendido','pagado'].includes(l.estado)){porConsR[k].ven++;porConsR[k].val+=l.venta.precioVenta;}
+    if(l.estado==='vendido') porConsR[k].pag+=l.venta.montoConsignante; });
+  const estados = {}; L.forEach(l=>{ estados[l.estado]=(estados[l.estado]||0)+1; });
+  const maxCat = catOrden.length ? catOrden[0][1].n : 1;
+
+  $('#repCards').innerHTML = `
+    <div class="card"><h3>Rotación del inventario</h3><p class="sub">Qué proporción de lo recibido llegó a venderse</p>
+      <div class="grid g2" style="margin-top:8px">
+        ${kpi(recibidos,'Libros recibidos','')}
+        ${kpi(vend.length,'Vendidos','v')}
+        ${kpi(rot.toFixed(0)+'%','Tasa de rotación', rot>=20?'v':'r')}
+        ${kpi(promDias?promDias+' días':'—','Promedio hasta la venta','')}
+      </div>
+      ${recibidos && rot < 20 && dias >= 120 ? '<div class="note warn" style="margin-top:12px">La rotación está por debajo del 20% a 120 días. Conviene revisar curaduría, precios o exhibición antes de abrir más cupos.</div>' : ''}
+    </div>
+    <div class="card"><h3>Resultado económico</h3><p class="sub">Reparto ${S.cfg.pctConsignante}/${S.cfg.pctLibreria} sobre lo vendido</p>
+      <div class="grid g2" style="margin-top:8px">
+        ${kpi(money(vend.reduce((s,l)=>s+l.venta.precioVenta,0)),'Venta total','')}
+        ${kpi(money(vend.reduce((s,l)=>s+l.venta.montoLibreria,0)),'Para La Madriguera','v')}
+        ${kpi(money(vend.reduce((s,l)=>s+l.venta.montoConsignante,0)),'Para consignantes','t')}
+        ${kpi(money(ticket),'Ticket promedio','')}
+      </div></div>
+    <div class="card"><h3>Categorías más vendidas</h3>
+      ${catOrden.length ? catOrden.slice(0,8).map(([k,v])=>`
+        <div style="margin-bottom:9px"><div class="row" style="font-size:12.5px"><span style="flex:1">${esc(k)}</span><b>${v.n}</b><span class="sub">${money(v.v)}</span></div>
+        <div style="height:6px;background:var(--surface-2);border-radius:99px;overflow:hidden;margin-top:3px"><div style="height:100%;width:${(v.n/maxCat*100).toFixed(0)}%;background:var(--verde)"></div></div></div>`).join('')
+        : '<p class="sub">Todavía no hay ventas en este período.</p>'}</div>
+    <div class="card"><h3>Situación de los libros</h3>
+      <div class="tw"><table><tbody>${Object.entries(estados).sort((a,b)=>b[1]-a[1]).map(([k,v])=>
+        `<tr><td><span class="tag ${SITUACIONES[k].c}">${SITUACIONES[k].t}</span></td><td style="text-align:right"><b>${v}</b></td></tr>`).join('')||'<tr><td class="sub">Sin datos.</td></tr>'}</tbody></table></div></div>
+    <div class="card" style="grid-column:1/-1"><h3>Detalle por consignante</h3>
+      <div class="tw"><table><thead><tr><th>Consignante</th><th>Recibidos</th><th>Vendidos</th><th>% rotación</th><th>Venta</th><th>Por pagar</th></tr></thead><tbody>
+        ${Object.entries(porConsR).sort((a,b)=>b[1].ven-a[1].ven).map(([k,v])=>
+          `<tr><td>${esc(k)}</td><td>${v.rec}</td><td>${v.ven}</td><td>${v.rec?(v.ven/v.rec*100).toFixed(0):0}%</td><td>${money(v.val)}</td><td>${v.pag?`<b style="color:var(--terra)">${money(v.pag)}</b>`:'—'}</td></tr>`).join('')
+          ||'<tr><td class="sub">Sin datos en este período.</td></tr>'}</tbody></table></div>
+      <div class="row" style="margin-top:12px"><button class="btn ghost sm" onclick="exportar('reporte')">Descargar este reporte en CSV</button></div></div>
+  `;
+}
+
+/* ============================ AJUSTES ============================ */
+function pintarAjustes(){
+  const c = S.cfg;
+  $('#cfgPctCons').value = c.pctConsignante; $('#cfgPctLib').value = c.pctLibreria;
+  $('#cfgPlazo').value = c.plazoDias; $('#cfgRetiro').value = c.diasRetiro;
+  $('#cfgMin').value = c.precioMinimo; $('#cfgRedondeo').value = String(c.redondeo);
+  $('#cfgNombre').value = c.nombre; $('#cfgRuc').value = c.ruc; $('#cfgRep').value = c.representante;
+  $('#cfgCiudad').value = c.ciudad; $('#cfgDir').value = c.direccion; $('#cfgUrl').value = c.urlPublica||'';
+  const et = { estado:'Estado físico', demanda:'Demanda del género', antiguedad:'Antigüedad', edicion:'Edición', rotacion:'Rotación esperada' };
+  const nom = { nuevo:'Nuevo', muy_bueno:'Muy bueno', bueno:'Bueno', aceptable:'Aceptable', alta:'Alta', media:'Media', baja:'Baja',
+    reciente:'Reciente (≤2 años)', antigua:'11 a 20 años', muy_antigua:'Más de 20 años', especial:'Especial / tapa dura', comun:'Común', bolsillo:'Bolsillo',
+    rapida:'Rápida', normal:'Normal', lenta:'Lenta' };
+  $('#cfgFactores').innerHTML = Object.entries(c.factores).map(([grupo,vals])=>`
+    <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin:12px 0 8px">${et[grupo]||grupo}</h4>
+    <div class="grid g4">${Object.entries(vals).map(([k,v])=>
+      `<label class="f"><span>${nom[k]|| (grupo==='antiguedad'&&k==='media'?'3 a 10 años':k)}</span>
+        <input type="number" step="0.01" min="0" data-f="${grupo}" data-k="${k}" value="${v}"></label>`).join('')}</div>`).join('');
+  $('#estadoConn').innerHTML = S.modo === 'local'
+    ? 'Modo local: los datos viven solo en este navegador. Para trabajar entre computadora y celular y para que el consignante apruebe por enlace, conecta Firebase.'
+    : `Conectado a Firebase · proyecto <b class="mono">${esc((leerCfgGuardada()||FIREBASE_CONFIG_FIJA||{}).projectId||'—')}</b> · usuario <b>${esc(S.user?S.user.email:'')}</b> · rol <b>${esc(S.rol||'sin rol asignado')}</b><br>Colecciones: <span class="mono">${Object.values(COL).join(' · ')}</span>`;
+}
+
+async function guardarAjustes(){
+  const c = Object.assign({}, S.cfg);
+  c.pctConsignante = parseFloat($('#cfgPctCons').value)||70;
+  c.pctLibreria = parseFloat($('#cfgPctLib').value)||30;
+  if (c.pctConsignante + c.pctLibreria !== 100) return toast('Los porcentajes deben sumar 100','err');
+  c.plazoDias = parseInt($('#cfgPlazo').value,10)||120;
+  c.diasRetiro = parseInt($('#cfgRetiro').value,10)||15;
+  c.precioMinimo = parseFloat($('#cfgMin').value)||0;
+  c.redondeo = parseFloat($('#cfgRedondeo').value);
+  c.nombre = $('#cfgNombre').value.trim(); c.ruc = $('#cfgRuc').value.trim();
+  c.representante = $('#cfgRep').value.trim(); c.ciudad = $('#cfgCiudad').value.trim();
+  c.direccion = $('#cfgDir').value.trim(); c.urlPublica = $('#cfgUrl').value.trim();
+  $$('#cfgFactores input').forEach(i => { c.factores[i.dataset.f][i.dataset.k] = parseFloat(i.value)||0; });
+  c.id = 'general';
+  await DB.guardar(COL.cfg, c);
+  S.cfg = c; pintarTodo(); toast('Ajustes guardados','ok');
+}
+
+function respaldar(){
+  const data = { generado:new Date().toISOString(), cfg:S.cfg, consignantes:S.cons, libros:S.libros, aprobaciones:S.aprob };
+  bajarArchivo('respaldo-segunda-vida-' + hoyISO() + '.json', JSON.stringify(data,null,2), 'application/json');
+  toast('Respaldo descargado','ok');
+}
+
+/* ============================ MODAL ============================ */
+function modal(titulo, cuerpo, botones){
+  const html = `<div class="modal-bg" onclick="if(event.target===this)cerrarModal()"><div class="modal">
+    <header><h3>${esc(titulo)}</h3><button class="x" onclick="cerrarModal()">×</button></header>
+    <div class="body">${cuerpo}</div>
+    <footer id="modalFoot"></footer></div></div>`;
+  $('#modales').innerHTML = html;
+  const f = $('#modalFoot');
+  (botones||[]).forEach((b,i)=>{
+    const el = document.createElement('button');
+    el.className = 'btn ' + (b.c||''); el.textContent = b.t; el.onclick = b.f;
+    f.appendChild(el);
+  });
+  document.body.style.overflow = 'hidden';
+}
+function cerrarModal(){ $('#modales').innerHTML = ''; document.body.style.overflow = ''; }
+document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+
+/* ============================ DOCUMENTOS ============================ */
+function librosDelContrato(consId){
+  return S.libros.filter(l => l.consignanteId === consId && l.aceptado !== false &&
+    !['rechazado'].includes(l.estado)).sort((a,b)=>(a.codigo||'').localeCompare(b.codigo||''));
+}
+
+function clausulas(c, cfg){
+  return [
+    ['PRIMERA — OBJETO Y NATURALEZA DEL CONTRATO',
+     'La consignación NO implica compra: LA LIBRERÍA no adquiere la propiedad de los libros entregados, únicamente los exhibe y gestiona su venta a cambio de una comisión. EL CONSIGNANTE mantiene la propiedad de sus libros en todo momento hasta que estos se vendan. LA LIBRERÍA actúa como intermediaria de venta. Solo cuando un libro se vende se genera el pago a EL CONSIGNANTE. Los libros que no se venden se devuelven a EL CONSIGNANTE o se gestionan según lo previsto en la cláusula cuarta.'],
+    ['SEGUNDA — REPARTO DEL PRODUCTO DE LA VENTA',
+     `De cada libro vendido, el reparto sobre el precio final de venta al público es: ${cfg.pctConsignante}% para EL CONSIGNANTE (propietario del libro) y ${cfg.pctLibreria}% para LA LIBRERÍA (comisión por exhibición, espacio, atención y gestión de venta). El precio de venta de cada libro se acuerda entre EL CONSIGNANTE y LA LIBRERÍA al momento de la recepción, tomando en cuenta su estado, demanda, edición y rotación esperada. Ambas partes deben dar su conformidad con el precio antes de registrarlo en la Ficha de Ingreso (Anexo A). Una vez acordado, el precio solo podrá modificarse con el consentimiento de ambas partes.`],
+    ['TERCERA — RECEPCIÓN Y CRITERIOS DE SELECCIÓN',
+     'LA LIBRERÍA se reserva el derecho de aceptar o rechazar cualquier libro. Se priorizan ejemplares en buen estado y de géneros con demanda. No se aceptan libros que presenten: humedad, hongos, olor a moho o páginas pegadas; páginas faltantes, subrayados extensos o anotaciones que afecten la lectura; daño estructural grave (lomo roto, tapas sueltas); contenido no apto para el público o ediciones fotocopiadas o pirateadas. Todo libro aceptado se registra en una Ficha de Ingreso, que detalla título, autor, estado y precio asignado. La firma de esta Ficha (Anexo A) es requisito para que el libro ingrese al programa.'],
+    ['CUARTA — PLAZO DE CONSIGNACIÓN Y DEVOLUCIÓN',
+     `Cada libro permanece en consignación por un plazo de ${cfg.plazoDias} días calendario contados desde su fecha de ingreso. Vencido el plazo, EL CONSIGNANTE será notificado (vía WhatsApp, correo o teléfono registrado) para retirar los libros no vendidos, y dispondrá de ${cfg.diasRetiro} días calendario desde la notificación para retirarlos en el local, en horario de atención. Si transcurridos esos ${cfg.diasRetiro} días EL CONSIGNANTE no retira los libros, estos pasarán a ser propiedad de LA LIBRERÍA, que podrá donarlos, liquidarlos o disponer de ellos libremente, sin obligación de pago alguno. Esta cesión opera automáticamente por el solo vencimiento del plazo y es aceptada expresamente por EL CONSIGNANTE al firmar este contrato. Antes del vencimiento del plazo, EL CONSIGNANTE podrá solicitar una extensión, la cual se otorgará de mutuo acuerdo con LA LIBRERÍA según la rotación esperada del libro.`],
+    ['QUINTA — LIQUIDACIÓN Y FORMA DE PAGO',
+     `LA LIBRERÍA lleva un registro de las ventas de cada consignante en su sistema de punto de venta. El pago se realiza con periodicidad mensual, dentro de los primeros 5 días hábiles del mes siguiente a la venta, en efectivo o transferencia bancaria a la cuenta que EL CONSIGNANTE indique, previa coordinación entre las partes${c.formaPago?' (forma preferida registrada: '+({efectivo:'efectivo',transferencia:'transferencia bancaria',credito:'crédito de tienda'}[c.formaPago]||c.formaPago)+')':''}. LA LIBRERÍA entregará, junto con el pago, un reporte de los libros vendidos en el período correspondiente.`],
+    ['SEXTA — DAÑO, PÉRDIDA O DETERIORO',
+     'LA LIBRERÍA no asume responsabilidad por daño accidental, robo o deterioro normal derivado de la exhibición de los libros, salvo negligencia grave comprobada. EL CONSIGNANTE acepta este riesgo como propio del programa de consignación.'],
+    ['SÉPTIMA — DURACIÓN Y TERMINACIÓN ANTICIPADA',
+     'Este contrato rige desde la fecha de firma hasta el retiro total de los libros consignados o su cesión conforme a la cláusula cuarta. Cualquiera de las partes puede solicitar la terminación anticipada del contrato respecto de los libros aún no vendidos, notificando con al menos 5 días de anticipación, sin perjuicio de las ventas ya realizadas.'],
+    ['OCTAVA — TRATAMIENTO DE DATOS',
+     'EL CONSIGNANTE autoriza a LA LIBRERÍA a registrar y conservar sus datos de contacto y los datos de los libros entregados, con la única finalidad de administrar el programa de consignación, coordinar pagos y notificar vencimientos, conforme a la normativa ecuatoriana de protección de datos personales.'],
+    ['NOVENA — ACEPTACIÓN',
+     `Ambas partes declaran haber leído y comprendido íntegramente los términos de este contrato y lo suscriben en señal de conformidad, en la ciudad de ${cfg.ciudad}, en dos ejemplares de igual valor y contenido.`]
+  ];
+}
+
+function previsualizarDoc(){
+  const id = $('#docCons').value;
+  if (!id){ $('#docPrev').innerHTML = '<p class="sub">Selecciona un consignante para ver el documento.</p>'; return; }
+  const c = consPorId(id), cfg = S.cfg, tipo = $('#docTipo').value;
+  const libros = librosDelContrato(id);
+  const aprobados = libros.filter(l=>['aprobado','publicado','vendido','pagado','vencido'].includes(l.estado));
+  let h = '';
+
+  if (tipo === 'completo' || tipo === 'contrato'){
+    h += `<div style="text-align:center;margin-bottom:16px">
+      <b>${esc(cfg.nombre)}</b><br>
+      <span class="sub">Programa de consignación “Tu libro tiene otra vida” — Campaña Segunda Vida</span>
+      <h3 style="margin-top:10px">CONTRATO DE CONSIGNACIÓN DE LIBROS</h3></div>
+      <p>Conste por el presente documento el contrato de consignación de libros que celebran, por una parte, <b>${esc(cfg.nombre)}</b> (en adelante “LA LIBRERÍA”), con RUC/C.C. ${esc(cfg.ruc||'____________')}, representada por ${esc(cfg.representante||'su propietaria/administradora')}; y por otra parte, la persona cuyos datos constan a continuación (en adelante “EL CONSIGNANTE”):</p>
+      <table style="margin:12px 0"><tbody>
+        <tr><td style="width:35%"><b>Nombre completo</b></td><td>${esc(nombreCons(c))}</td></tr>
+        <tr><td><b>Cédula de identidad</b></td><td>${esc(c.cedula||'')}</td></tr>
+        <tr><td><b>Celular / WhatsApp</b></td><td>${esc(c.telefono||'')}</td></tr>
+        <tr><td><b>Correo electrónico</b></td><td>${esc(c.email||'')}</td></tr>
+        <tr><td><b>Usuario de Instagram</b></td><td>${esc(c.instagram||'')}</td></tr>
+        <tr><td><b>Dirección</b></td><td>${esc(c.direccion||'')}</td></tr>
+        <tr><td><b>Fecha de ingreso de los libros</b></td><td>${fmtFecha(libros.length?libros[0].fechaIngreso:hoyISO())}</td></tr>
+      </tbody></table>
+      <p>Ambas partes acuerdan someterse a las siguientes cláusulas:</p>`;
+    h += clausulas(c,cfg).map(([t,x])=>`<p style="margin-top:12px"><b>${esc(t)}</b><br>${esc(x)}</p>`).join('');
+    h += `<div style="display:flex;gap:40px;margin-top:44px;text-align:center">
+      <div style="flex:1;border-top:1px solid #000;padding-top:6px">${esc(cfg.nombre)}<br><span class="sub">C.C./RUC: ${esc(cfg.ruc||'______________')}</span></div>
+      <div style="flex:1;border-top:1px solid #000;padding-top:6px">${esc(nombreCons(c))}<br><span class="sub">C.C.: ${esc(c.cedula||'______________')}</span></div></div>`;
+  }
+
+  if (tipo === 'completo' || tipo === 'anexo'){
+    h += `<h3 style="margin:26px 0 6px">ANEXO A — FICHA DE INGRESO DE LIBROS</h3>
+      <p class="sub">Se completa una fila por cada libro entregado. La cantidad de libros aceptados por ingreso está sujeta a curaduría de LA LIBRERÍA, sin tope fijo.</p>
+      <div class="tw"><table><thead><tr><th>#</th><th>Código</th><th>Título</th><th>Autor</th><th>ISBN</th><th>Estado</th><th>Precio venta</th><th>${cfg.pctConsignante}% consignante</th><th>Vence</th></tr></thead><tbody>
+      ${libros.map((l,i)=>`<tr><td>${i+1}</td><td class="mono">${esc(l.codigo)}</td><td>${esc(l.titulo)}</td><td>${esc(l.autor||'')}</td>
+        <td class="mono">${esc(l.isbn||'')}</td><td>${ESTADOS_FISICOS[l.estadoFisico]||''}</td><td>${money(l.precioFinal)}</td>
+        <td>${money((l.precioFinal||0)*cfg.pctConsignante/100)}</td><td>${fmtFecha(l.fechaLimite)}</td></tr>`).join('')
+        || '<tr><td colspan="9" class="sub">Sin libros registrados para este consignante.</td></tr>'}
+      </tbody></table></div>
+      <p style="margin-top:10px"><b>Total de libros:</b> ${libros.length} · <b>Valor total de exhibición:</b> ${money(libros.reduce((s,l)=>s+(l.precioFinal||0),0))} · <b>Corresponde al consignante si se vende todo:</b> ${money(libros.reduce((s,l)=>s+(l.precioFinal||0),0)*cfg.pctConsignante/100)}</p>
+      <div style="display:flex;gap:40px;margin-top:36px;text-align:center">
+        <div style="flex:1;border-top:1px solid #000;padding-top:6px">Recibido por LA LIBRERÍA</div>
+        <div style="flex:1;border-top:1px solid #000;padding-top:6px">${esc(nombreCons(c))}<br><span class="sub">EL CONSIGNANTE</span></div></div>`;
+  }
+
+  if (tipo === 'precios'){
+    h += `<h3>DETALLE DE PRECIOS APROBADOS</h3>
+      <p class="sub">${esc(nombreCons(c))} · ${esc(c.cedula||'')} · generado el ${fmtFecha(hoyISO())}</p>
+      <div class="tw"><table><thead><tr><th>Código</th><th>Título</th><th>Precio</th><th>${cfg.pctConsignante}%</th><th>${cfg.pctLibreria}%</th><th>Aprobado</th></tr></thead><tbody>
+      ${aprobados.map(l=>`<tr><td class="mono">${esc(l.codigo)}</td><td>${esc(l.titulo)}</td><td>${money(l.precioFinal)}</td>
+        <td>${money(l.precioFinal*cfg.pctConsignante/100)}</td><td>${money(l.precioFinal*cfg.pctLibreria/100)}</td>
+        <td class="sub">${l.aprobacion?fmtFechaHora(l.aprobacion.fecha):'—'}</td></tr>`).join('')
+        || '<tr><td colspan="6" class="sub">Todavía no hay precios aprobados.</td></tr>'}</tbody></table></div>`;
+  }
+  $('#docPrev').innerHTML = h;
+}
+
+function imprimirDoc(){ if (!$('#docCons').value) return toast('Selecciona un consignante','err'); window.print(); }
+
+function descargarPDF(){
+  const id = $('#docCons').value;
+  if (!id) return toast('Selecciona un consignante','err');
+  if (!window.jspdf) return toast('No se pudo cargar el generador de PDF. Revisa tu conexión.','err');
+  const { jsPDF } = window.jspdf;
+  const c = consPorId(id), cfg = S.cfg, tipo = $('#docTipo').value;
+  const libros = librosDelContrato(id);
+  const doc = new jsPDF({ unit:'pt', format:'a4' });
+  const M = 52, W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  let y = M;
+  const salto = (alto) => { if (y + alto > H - 60){ doc.addPage(); y = M; } };
+  const parrafo = (txt, size, style, gap) => {
+    doc.setFont('helvetica', style||'normal'); doc.setFontSize(size||10);
+    const lineas = doc.splitTextToSize(txt, W - M*2);
+    lineas.forEach(l => { salto(14); doc.text(l, M, y); y += (size||10) * 1.35; });
+    y += (gap==null?7:gap);
+  };
+  const pie = () => {
+    const n = doc.internal.getNumberOfPages();
+    for (let i=1;i<=n;i++){
+      doc.setPage(i); doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(140);
+      doc.text(`${cfg.nombre} · Programa Segunda Vida · ${fmtFecha(hoyISO())}`, M, H-30);
+      doc.text(`Página ${i} de ${n}`, W-M, H-30, {align:'right'});
+      doc.setTextColor(0);
+    }
+  };
+
+  if (tipo === 'completo' || tipo === 'contrato'){
+    doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    doc.text(cfg.nombre, W/2, y, {align:'center'}); y += 16;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(110);
+    doc.text('Programa de consignación "Tu libro tiene otra vida" — Campaña Segunda Vida', W/2, y, {align:'center'}); y += 22;
+    doc.setTextColor(0); doc.setFont('helvetica','bold'); doc.setFontSize(13);
+    doc.text('CONTRATO DE CONSIGNACIÓN DE LIBROS', W/2, y, {align:'center'}); y += 24;
+    parrafo(`Conste por el presente documento el contrato de consignación de libros que celebran, por una parte, ${cfg.nombre} (en adelante "LA LIBRERÍA"), con RUC/C.C. ${cfg.ruc||'____________'}, representada por ${cfg.representante||'su propietaria/administradora'}; y por otra parte, la persona cuyos datos constan a continuación (en adelante "EL CONSIGNANTE"):`, 10, 'normal', 10);
+    doc.autoTable({
+      startY: y, theme:'grid', margin:{left:M,right:M},
+      styles:{ font:'helvetica', fontSize:9, cellPadding:5 },
+      columnStyles:{ 0:{ cellWidth:150, fontStyle:'bold', fillColor:[243,238,230] } },
+      body: [
+        ['Nombre completo', nombreCons(c)],
+        ['Cédula de identidad', c.cedula||''],
+        ['Celular / WhatsApp', c.telefono||''],
+        ['Correo electrónico', c.email||''],
+        ['Usuario de Instagram', c.instagram||''],
+        ['Dirección', c.direccion||''],
+        ['Fecha de ingreso de los libros', fmtFecha(libros.length?libros[0].fechaIngreso:hoyISO())]
+      ]
+    });
+    y = doc.lastAutoTable.finalY + 16;
+    parrafo('Ambas partes acuerdan someterse a las siguientes cláusulas:', 10, 'normal', 8);
+    clausulas(c,cfg).forEach(([t,x]) => { salto(40); parrafo(t, 10, 'bold', 3); parrafo(x, 9.5, 'normal', 9); });
+    salto(90); y += 34;
+    doc.setDrawColor(0); doc.line(M, y, M+190, y); doc.line(W-M-190, y, W-M, y); y += 13;
+    doc.setFontSize(9);
+    doc.text(cfg.nombre, M, y); doc.text(nombreCons(c), W-M-190, y); y += 12;
+    doc.setTextColor(120);
+    doc.text('C.C./RUC: ' + (cfg.ruc||'______________'), M, y);
+    doc.text('C.C.: ' + (c.cedula||'______________'), W-M-190, y);
+    doc.setTextColor(0);
+  }
+
+  if (tipo === 'completo' || tipo === 'anexo' || tipo === 'precios'){
+    if (tipo !== 'precios' && tipo !== 'anexo') doc.addPage(); else if (y > M) { if (tipo!=='completo') y = M; }
+    if (tipo === 'completo') y = M;
+    doc.setFont('helvetica','bold'); doc.setFontSize(12);
+    const titAnexo = tipo === 'precios' ? 'DETALLE DE PRECIOS APROBADOS' : 'ANEXO A — FICHA DE INGRESO DE LIBROS';
+    doc.text(titAnexo, M, y); y += 15;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(110);
+    doc.text(`${nombreCons(c)} · C.C. ${c.cedula||''} · ${fmtFecha(hoyISO())}`, M, y); y += 16; doc.setTextColor(0);
+    const filas = (tipo==='precios' ? libros.filter(l=>['aprobado','publicado','vendido','pagado','vencido'].includes(l.estado)) : libros);
+    doc.autoTable({
+      startY:y, margin:{left:M,right:M}, theme:'striped',
+      headStyles:{ fillColor:[47,93,74], textColor:255, fontSize:8.5 },
+      styles:{ font:'helvetica', fontSize:8.5, cellPadding:4 },
+      head: [['#','Código','Título','Autor','Estado','Precio', cfg.pctConsignante+'%','Vence','Firma']],
+      body: filas.map((l,i)=>[ i+1, l.codigo, (l.titulo||'').slice(0,46), (l.autor||'').slice(0,24),
+        ESTADOS_FISICOS[l.estadoFisico]||'', money(l.precioFinal), money((l.precioFinal||0)*cfg.pctConsignante/100), fmtFecha(l.fechaLimite), '' ]),
+      columnStyles:{ 0:{cellWidth:18}, 1:{cellWidth:46}, 5:{cellWidth:42}, 6:{cellWidth:48}, 7:{cellWidth:50}, 8:{cellWidth:52} }
+    });
+    y = doc.lastAutoTable.finalY + 14;
+    const tot = filas.reduce((s,l)=>s+(l.precioFinal||0),0);
+    parrafo(`Total de libros: ${filas.length}   ·   Valor total de exhibición: ${money(tot)}   ·   Corresponde al consignante si se vende todo: ${money(tot*cfg.pctConsignante/100)}`, 9.5, 'bold', 24);
+    salto(70);
+    doc.line(M, y+22, M+190, y+22); doc.line(W-M-190, y+22, W-M, y+22);
+    doc.setFontSize(9);
+    doc.text('Recibido por LA LIBRERÍA', M, y+35);
+    doc.text(nombreCons(c) + ' — EL CONSIGNANTE', W-M-190, y+35);
+  }
+  pie();
+  const nom = (tipo==='precios'?'precios':tipo==='anexo'?'anexo':'contrato') + '-segunda-vida-' + (c.cedula||nombreCons(c).replace(/\s+/g,'-').toLowerCase()) + '.pdf';
+  doc.save(nom);
+  toast('PDF generado','ok');
+}
+
+/* ============================ EXPORTAR CSV ============================ */
+function librosParaExportar(){
+  const modo = $('#expEstado').value, consId = $('#expCons').value, desde = $('#expDesde').value;
+  let L = S.libros.slice();
+  if (modo === 'listos') L = L.filter(l=>['aprobado','publicado'].includes(l.estado));
+  else if (modo !== 'todos') L = L.filter(l=>l.estado===modo);
+  if (consId) L = L.filter(l=>l.consignanteId===consId);
+  if (desde) L = L.filter(l=>(l.fechaIngreso||'') >= desde);
+  return L.sort((a,b)=>(a.codigo||'').localeCompare(b.codigo||''));
+}
+
+const FORMATOS = {
+  pos: {
+    nombre:'catalogo-pos',
+    cols:['codigo','codigo_barras','nombre','categoria','precio','stock','costo','tipo','proveedor','iva','descripcion'],
+    fila: l => {
+      const c = consPorId(l.consignanteId)||{};
+      return [ l.codigo, l.isbn||l.codigo, l.titulo + (l.autor?' — '+l.autor:''), 'Libros consignación' ,
+        (l.precioFinal||0).toFixed(2), 1, ((l.precioFinal||0)*S.cfg.pctConsignante/100).toFixed(2),
+        'Consignación', nombreCons(c), '0', (l.descripcion||'').replace(/\s+/g,' ').slice(0,300) ];
+    }
+  },
+  web: {
+    nombre:'catalogo-web',
+    cols:['sku','isbn','titulo','autor','editorial','anio','categoria','estado_libro','precio','stock','descripcion','imagen','condicion','programa'],
+    fila: l => [ l.codigo, l.isbn||'', l.titulo, l.autor||'', l.editorial||'', l.anio||'', l.categoria||'',
+      ESTADOS_FISICOS[l.estadoFisico]||'', (l.precioFinal||0).toFixed(2), 1,
+      (l.descripcion||'').replace(/\s+/g,' ').slice(0,600), l.portadaUrl||'', 'Usado — ' + (ESTADOS_FISICOS[l.estadoFisico]||''), 'Segunda Vida' ]
+  },
+  interno: {
+    nombre:'inventario-interno',
+    cols:['codigo_interno','isbn','titulo','autor','editorial','anio','categoria','estado_fisico','danios','observaciones',
+          'precio_referencia','precio_sugerido','precio_venta','pct_madriguera','monto_madriguera','pct_consignante','monto_consignante',
+          'situacion','consignante','cedula','telefono','email','instagram','forma_pago',
+          'fecha_ingreso','fecha_limite','fecha_aprobacion','fecha_venta','precio_venta_real','fecha_pago','descripcion','imagen_portada'],
+    fila: l => {
+      const c = consPorId(l.consignanteId)||{}, p = l.precioFinal||0;
+      return [ l.codigo, l.isbn||'', l.titulo, l.autor||'', l.editorial||'', l.anio||'', l.categoria||'',
+        ESTADOS_FISICOS[l.estadoFisico]||'', (l.danios||[]).join('; '), (l.observaciones||'').replace(/\s+/g,' '),
+        (l.precioNuevoEst||0).toFixed(2), (l.precioSugerido||0).toFixed(2), p.toFixed(2),
+        S.cfg.pctLibreria, (p*S.cfg.pctLibreria/100).toFixed(2), S.cfg.pctConsignante, (p*S.cfg.pctConsignante/100).toFixed(2),
+        SITUACIONES[l.estado].t, nombreCons(c), c.cedula||'', c.telefono||'', c.email||'', c.instagram||'', c.formaPago||'',
+        l.fechaIngreso||'', l.fechaLimite||'', l.aprobacion?String(l.aprobacion.fecha||'').slice(0,10):'',
+        l.venta?l.venta.fecha:'', l.venta?l.venta.precioVenta.toFixed(2):'', l.pago?String(l.pago.fecha).slice(0,10):'',
+        (l.descripcion||'').replace(/\s+/g,' ').slice(0,600), l.portadaUrl||'' ];
+    }
+  }
+};
+
+function exportar(tipo){
+  if (tipo === 'reporte') return exportarReporte();
+  const f = FORMATOS[tipo];
+  const L = librosParaExportar();
+  if (!L.length) return toast('No hay libros con esos filtros','err');
+  const filas = L.map(f.fila);
+  const csv = aCSV([f.cols].concat(filas));
+  bajarArchivo(`${f.nombre}-segunda-vida-${hoyISO()}.csv`, csv, 'text/csv');
+  vistaPreviaCSV(f.cols, filas);
+  toast(`${L.length} libro(s) exportados`,'ok');
+}
+
+function exportarReporte(){
+  const rows = [['consignante','libros_recibidos','vendidos','tasa_rotacion','venta_total','por_pagar','pagado']];
+  const g = {};
+  S.libros.forEach(l=>{
+    const k = l.consignanteNombre||'—';
+    g[k] = g[k] || {rec:0,ven:0,val:0,pag:0,pagado:0};
+    g[k].rec++;
+    if (['vendido','pagado'].includes(l.estado)){ g[k].ven++; g[k].val += l.venta.precioVenta; }
+    if (l.estado==='vendido') g[k].pag += l.venta.montoConsignante;
+    if (l.estado==='pagado') g[k].pagado += l.venta.montoConsignante;
+  });
+  Object.entries(g).forEach(([k,v])=>rows.push([k,v.rec,v.ven,(v.rec?(v.ven/v.rec*100).toFixed(0):0)+'%',v.val.toFixed(2),v.pag.toFixed(2),v.pagado.toFixed(2)]));
+  bajarArchivo('reporte-consignantes-'+hoyISO()+'.csv', aCSV(rows), 'text/csv');
+  toast('Reporte descargado','ok');
+}
+
+function vistaPreviaCSV(cols, filas){
+  $('#expPrev').innerHTML = `<table><thead><tr>${cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>
+    ${filas.slice(0,6).map(f=>`<tr>${f.map(v=>`<td>${esc(String(v).slice(0,60))}</td>`).join('')}</tr>`).join('')}</tbody></table>
+    <p class="sub" style="margin-top:8px">Mostrando ${Math.min(6,filas.length)} de ${filas.length} fila(s).</p>`;
+}
+
+function aCSV(rows){
+  return rows.map(r => r.map(v => {
+    const s = v == null ? '' : String(v);
+    return /[",;\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }).join(',')).join('\r\n');
+}
+
+function bajarArchivo(nombre, contenido, mime){
+  const blob = new Blob(['﻿' + contenido], { type: mime + ';charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = nombre;
+  document.body.appendChild(a); a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 800);
+}
+
+/* ============================ DATOS DE EJEMPLO ============================ */
+async function cargarDemo(){
+  if (!confirm('Se crearán 3 consignantes y 6 libros de ejemplo para que pruebes el flujo completo. ¿Continuar?')) return;
+  const demoCons = [
+    { nombres:'Valentina', apellidos:'Cedeño Ríos', cedula:'0930112233', telefono:'0991234567', email:'valentina@ejemplo.com', instagram:'@valelee', formaPago:'transferencia', datosPago:'Banco Pichincha · ahorros', aceptaTerminos:true, fechaAceptacion:new Date().toISOString(), activo:true, creado:new Date().toISOString() },
+    { nombres:'Andrés', apellidos:'Loor Mendoza', cedula:'0912345678', telefono:'0987654321', email:'andres@ejemplo.com', instagram:'@andreslee', formaPago:'efectivo', aceptaTerminos:true, fechaAceptacion:new Date().toISOString(), activo:true, creado:new Date().toISOString() },
+    { nombres:'Camila', apellidos:'Vera Ponce', cedula:'0925556677', telefono:'0999888777', email:'camila@ejemplo.com', instagram:'@camivera', formaPago:'credito', aceptaTerminos:false, activo:true, creado:new Date().toISOString() }
+  ];
+  const guardados = [];
+  for (const c of demoCons){ c.codigo = await DB.siguienteCodigo('cons'); const s = await DB.guardar(COL.cons, c); S.cons.push(s); guardados.push(s); }
+  const demoLibros = [
+    { titulo:'Cien años de soledad', autor:'Gabriel García Márquez', editorial:'Sudamericana', anio:'1967', categoria:'Clásicos', isbn:'9788437604947', estadoFisico:'bueno', precioNuevoEst:22, edicion:'comun', rotacion:'normal' },
+    { titulo:'Alas de sangre', autor:'Rebecca Yarros', editorial:'Planeta', anio:'2023', categoria:'Fantasía', isbn:'9788408277507', estadoFisico:'muy_bueno', precioNuevoEst:28, edicion:'especial', rotacion:'rapida' },
+    { titulo:'La casa de los espíritus', autor:'Isabel Allende', editorial:'Plaza & Janés', anio:'1982', categoria:'Literatura', isbn:'9788401337208', estadoFisico:'aceptable', precioNuevoEst:19, edicion:'bolsillo', rotacion:'normal' },
+    { titulo:'Chainsaw Man vol. 1', autor:'Tatsuki Fujimoto', editorial:'Norma', anio:'2021', categoria:'Manga y cómic', isbn:'9788467941975', estadoFisico:'nuevo', precioNuevoEst:12, edicion:'comun', rotacion:'rapida' },
+    { titulo:'El principito', autor:'Antoine de Saint-Exupéry', editorial:'Salamandra', anio:'2016', categoria:'Infantil', isbn:'9788498381498', estadoFisico:'bueno', precioNuevoEst:14, edicion:'comun', rotacion:'rapida' },
+    { titulo:'Sapiens', autor:'Yuval Noah Harari', editorial:'Debate', anio:'2014', categoria:'No ficción', isbn:'9788499926223', estadoFisico:'muy_bueno', precioNuevoEst:26, edicion:'comun', rotacion:'normal' }
+  ];
+  for (let i=0;i<demoLibros.length;i++){
+    const l = demoLibros[i];
+    const c = guardados[i % guardados.length];
+    l.consignanteId = c.id; l.consignanteNombre = nombreCons(c);
+    l.demanda = DEMANDA_POR_CAT[l.categoria] || 'media';
+    l.antiguedad = antiguedadPorAnio(l.anio);
+    l.aceptado = true; l.danios = []; l.fotos = [];
+    l.codigo = await DB.siguienteCodigo('libros');
+    l.fechaIngreso = sumarDias(hoyISO(), -(i*11));
+    l.fechaLimite = sumarDias(l.fechaIngreso, S.cfg.plazoDias);
+    l.precioSugerido = calcularPrecio(l).precio;
+    l.precioFinal = l.precioSugerido;
+    l.estado = 'aceptado'; l.creado = new Date().toISOString();
+    l.historial = [{ f:new Date().toISOString(), e:'aceptado', u:'demo' }];
+    const s = await DB.guardar(COL.libros, l); S.libros.push(s);
+  }
+  pintarTodo(); irA('inventario');
+  toast('Datos de ejemplo cargados','ok');
+}
+
+/* ============================ ENGANCHES FINALES ============================ */
+document.addEventListener('keydown', e => {
+  const el = document.activeElement;
+  if (e.key === 'Enter' && el && el.id === 'isbnIn'){ e.preventDefault(); buscarISBN(); }
+});
+window.addEventListener('beforeunload', () => { if (S.camStream) cerrarCamara(); });
+</script>
+</body>
+</html>
