@@ -1245,6 +1245,7 @@ function abrirLibro(id, esNuevo, pre){
     `<input type="radio" name="${name}" id="${name}_${k}" value="${k}" ${val===k?'checked':''} onchange="recalc()"><label for="${name}_${k}">${v}</label>`).join('');
 
   modal(id ? 'Libro ' + l.codigo : 'Nuevo libro', `
+    ${l.estado==='vendido' && l.venta && l.venta.origen==='POS' ? `<div class="note info">Venta registrada en el POS el ${fmtFecha(l.venta.fecha)} por ${money(l.venta.precioVenta)}. Si esa venta se anuló o se borró en el POS, usa <b>Quitar del POS</b> y luego <b>Eliminar</b> para dejar el registro limpio.</div>` : ''}
     <div class="note ${l.fuente?'ok':'info'}" style="${l.fuente?'':'display:none'}">Datos completados automáticamente desde ${esc(l.fuente||'')}. Revisa y corrige lo que haga falta.</div>
     <p class="sub" style="margin:-6px 0 12px">Consignante: <b>${esc(nombreCons(c))}</b></p>
 
@@ -1302,7 +1303,7 @@ function abrirLibro(id, esNuevo, pre){
     <div id="splitBox"></div>
   `, [
     {t:'Cancelar', c:'ghost', f:()=>{cerrarModal();}},
-    id && l.posLibroId ? {t:'Quitar del POS', c:'ghost', f:()=>quitarDelPOS([l.codigo, l.posLibroId].filter(Boolean), false)} : null,
+    id && (l.posLibroId || l.origenPOS) ? {t:'Quitar del POS', c:'ghost', f:()=>quitarDelPOSConAviso(l, false)} : null,
     id ? {t:'Eliminar', c:'danger', f:()=>eliminarLibro(id)} : null,
     {t: id?'Guardar cambios':'Guardar y seguir escaneando', f:()=>guardarLibro(id, consId, l)}
   ].filter(Boolean));
@@ -1445,7 +1446,7 @@ async function eliminarLibro(id){
   const enPOS = l.posLibroId || l.origenPOS;
   if (!confirm(`¿Eliminar definitivamente ${l.codigo} — ${l.titulo}?` + (enPOS ? ' También se quitará del módulo de consignación del POS.' : '') + ' Esta acción no se puede deshacer.')) return;
   if (S.modo === 'nube' && S.cfg.sincronizarPOS !== false)
-    await quitarDelPOS([l.codigo, l.posLibroId].filter(Boolean), true);
+    await quitarDelPOSConAviso(l, true);
   await DB.borrar(COL.libros, id);
   S.libros = S.libros.filter(x=>x.id!==id);
   S.lote = S.lote.filter(x=>x!==id);
@@ -2269,7 +2270,7 @@ async function publicarEnPOS(ids, silencioso){
 /* Saca un libro del POS: al retirarlo, rechazarlo o eliminarlo aquí, no puede
    quedar disponible para venta allá. Nunca toca los que el POS ya vendió,
    para no romper su historial de ventas. */
-async function quitarDelPOS(claves, silencioso){
+async function quitarDelPOS(claves, silencioso, forzar){
   if (S.modo !== 'nube' || !claves.length) return 0;
   let n = 0, vendidos = 0;
   try{
@@ -2281,7 +2282,7 @@ async function quitarDelPOS(claves, silencioso){
       const quedan = [];
       for (const pl of v.libros){
         const coincide = claves.includes(pl.code) || claves.includes(pl.id);
-        if (coincide && pl.estado === 'vendido'){ vendidos++; quedan.push(pl); continue; }
+        if (coincide && pl.estado === 'vendido' && !forzar){ vendidos++; quedan.push(pl); continue; }
         if (coincide){ n++; continue; }
         quedan.push(pl);
       }
@@ -2290,9 +2291,27 @@ async function quitarDelPOS(claves, silencioso){
     });
   }catch(e){ if (!silencioso) toast('No se pudo quitar del POS: ' + e.message,'err'); return 0; }
   if (!silencioso && (n || vendidos)){
-    toast(n ? `${n} libro(s) retirados del POS` + (vendidos?` · ${vendidos} no se tocaron porque ya estaban vendidos`:'') : 'El libro ya estaba vendido en el POS: se conserva su registro', n?'ok':'err');
+    toast(n ? `${n} libro(s) retirados del POS` + (vendidos?` · ${vendidos} no se tocaron porque ya estaban vendidos`:'') : 'En el POS figura como vendido: usa “Quitar del POS” en la ficha para forzarlo', n?'ok':'err');
   }
   return n;
+}
+
+/* Quita el libro del POS avisando si allá figura como vendido. Se fuerza solo
+   cuando la venta correspondiente fue anulada o eliminada. */
+async function quitarDelPOSConAviso(l, silencioso){
+  if (S.modo !== 'nube' || S.cfg.sincronizarPOS === false) return 0;
+  let pl = null;
+  try{
+    const v = await leerConsignaPOS();
+    pl = v.libros.find(x => x.code === l.codigo || (l.posLibroId && x.id === l.posLibroId));
+  }catch(e){ if(!silencioso) toast('No se pudo leer el POS: ' + e.message,'err'); return 0; }
+  if (!pl){ if(!silencioso) toast('Este libro ya no está en el módulo del POS','ok'); return 0; }
+  let forzar = false;
+  if (pl.estado === 'vendido'){
+    if (!confirm(`En el POS, "${l.titulo}" figura como VENDIDO.\n\nSi lo quitas, desaparece del historial de consignación del POS. Hazlo solo si esa venta fue anulada o eliminada.\n\n¿Quitarlo de todas formas?`)) return 0;
+    forzar = true;
+  }
+  return await quitarDelPOS([l.codigo, l.posLibroId].filter(Boolean), silencioso, forzar);
 }
 
 /* --- POS  →  Segunda Vida: ventas --- */
