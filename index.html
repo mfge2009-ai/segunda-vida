@@ -353,6 +353,7 @@ tr:hover td{background:#FDFCFA}
 <!-- ---------- APROBACIONES ---------- -->
 <section class="page" id="p-aprobaciones">
   <div class="hd"><div><h2>Aprobaciones de precio</h2><p class="sub">El consignante confirma cada precio antes de que el libro entre a la venta</p></div></div>
+  <div id="panelRegularizar"></div>
   <div class="note info">Cada lote genera un enlace único. Puedes enviarlo por WhatsApp o Instagram, o abrirlo en tienda desde el celular o la tablet para que el consignante apruebe en el momento. Toda decisión queda registrada con fecha y hora.</div>
   <div id="listaAprob"></div>
 </section>
@@ -1606,12 +1607,13 @@ async function enviarAAprobacion(){
   await crearAprobacion(consId, libros);
 }
 
-async function crearAprobacion(consId, libros){
+async function crearAprobacion(consId, libros, regularizar){
   const c = consPorId(consId);
   const token = uid() + Math.random().toString(36).slice(2,8);
   const ap = {
     id: token, token, consignanteId: consId, consignanteNombre: nombreCons(c),
     creado: new Date().toISOString(), estado: 'pendiente', sincronizado: false,
+    tipo: regularizar ? 'regularizacion' : 'ingreso',
     condiciones: { pctCons:S.cfg.pctConsignante, pctLib:S.cfg.pctLibreria, plazo:S.cfg.plazoDias, libreria:S.cfg.nombre },
     items: libros.map(l => ({
       libroId:l.id, codigo:l.codigo, titulo:l.titulo, autor:l.autor||'', editorial:l.editorial||'',
@@ -1622,9 +1624,27 @@ async function crearAprobacion(consId, libros){
   };
   const saved = await DB.guardar(COL.aprob, ap);
   S.aprob.push(saved);
-  for (const l of libros){ if (l.estado !== 'pendiente_aprobacion') await cambiarEstado(l.id, 'pendiente_aprobacion', true); }
+  // En una regularización los libros siguen en exhibición: ya se están vendiendo
+  // y lo que falta es el respaldo, no sacarlos de la mesa.
+  if (!regularizar){
+    for (const l of libros){ if (l.estado !== 'pendiente_aprobacion') await cambiarEstado(l.id, 'pendiente_aprobacion', true); }
+  }
   pintarTodo(); irA('aprobaciones');
   mostrarEnlace(saved.id);
+}
+
+/* Libros que ya están en exhibición pero sin aprobación de precio registrada:
+   típicamente los que venían del módulo del POS. */
+function librosSinAprobacion(consId){
+  return S.libros.filter(l => l.consignanteId === consId && l.aceptado !== false &&
+    ['aprobado','publicado','vencido'].includes(l.estado) && !l.aprobacion);
+}
+
+async function regularizarAprobacion(consId){
+  const c = consPorId(consId); if (!c) return;
+  const libros = librosSinAprobacion(consId);
+  if (!libros.length) return toast('No hay libros pendientes de aprobar','ok');
+  await crearAprobacion(consId, libros, true);
 }
 
 function urlAprobacion(token){
@@ -1654,6 +1674,22 @@ Recuerda: si el libro se vende recibes el ${S.cfg.pctConsignante}% del precio, y
 }
 
 function pintarAprobaciones(){
+  // Consignantes con libros exhibiéndose sin aprobación de precio registrada
+  const pendientes = S.cons.map(c => ({ c, libros: librosSinAprobacion(c.id) })).filter(x => x.libros.length);
+  $('#panelRegularizar').innerHTML = !pendientes.length ? '' : `
+    <div class="card" style="border-color:var(--oro)">
+      <h3>Regularizar precios de libros que ya están en exhibición</h3>
+      <p class="sub">Estos libros se están vendiendo sin que quede registrada la conformidad del dueño con el precio. El enlace se lo pide sin bajarlos de la mesa; solo salen de exhibición si el consignante no está de acuerdo.</p>
+      <div class="tw"><table><thead><tr><th>Consignante</th><th>Libros</th><th>Valor en exhibición</th><th>Contacto</th><th></th></tr></thead><tbody>
+        ${pendientes.map(({c,libros})=>`<tr>
+          <td><b>${esc(nombreCons(c))}</b><br><small style="color:var(--ink-3)">${esc(c.codigo||'')}</small></td>
+          <td>${libros.length}</td>
+          <td>${money(libros.reduce((s,l)=>s+(l.precioFinal||0),0))}</td>
+          <td>${esc(c.telefono||'—')}</td>
+          <td style="text-align:right"><button class="btn sm" onclick="regularizarAprobacion('${c.id}')">Generar enlace</button></td>
+        </tr>`).join('')}
+      </tbody></table></div>
+    </div>`;
   const lista = S.aprob.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));
   $('#listaAprob').innerHTML = lista.length ? lista.map(ap=>{
     const ok = ap.items.filter(i=>i.decision==='aprobado').length;
@@ -1663,7 +1699,7 @@ function pintarAprobaciones(){
     return `<div class="card">
       <div class="hd" style="margin-bottom:10px">
         <div><h3>${esc(ap.consignanteNombre)}</h3>
-          <p class="sub">Enviado el ${fmtFechaHora(ap.creado)} · ${ap.items.length} libro(s) · ${money(total)}</p></div>
+          <p class="sub">Enviado el ${fmtFechaHora(ap.creado)} · ${ap.items.length} libro(s) · ${money(total)}${ap.tipo==='regularizacion'?' · regularización':''}</p></div>
         <div class="spacer"></div>
         <span class="tag ${pe? 't-oro':'t-verde'}">${pe? pe+' pendiente(s)':'Completa'}</span>
       </div>
@@ -1696,6 +1732,23 @@ async function sincronizarAprobaciones(avisar){
         if (it.decision === 'pendiente') continue;
         const l = libroPorId(it.libroId);
         if (!l) continue;
+        if (ap.tipo === 'regularizacion'){
+          if (l.aprobacion) continue;
+          l.aprobacion = { decision:it.decision, fecha:it.fecha, canal:it.canal||'enlace',
+                           comentario:it.comentario||'', regularizacion:true };
+          if (it.decision === 'rechazado'){
+            l.motivoRechazo = 'Precio no aprobado por el consignante';
+            if (l.estado !== 'vendido' && l.estado !== 'pagado'){
+              l.estado = 'aceptado';
+              if (S.cfg.sincronizarPOS !== false) await quitarDelPOS([l.codigo, l.posLibroId].filter(Boolean), true);
+            }
+          }
+          l.historial = (l.historial||[]).concat([{ f:it.fecha||new Date().toISOString(),
+            e: it.decision === 'aprobado' ? l.estado : 'aceptado', u:'consignante · regularización' }]);
+          await DB.guardar(COL.libros, l);
+          cambios++;
+          continue;
+        }
         const destino = it.decision === 'aprobado' ? 'aprobado' : 'rechazado';
         if (l.estado === 'pendiente_aprobacion'){
           l.aprobacion = { decision:it.decision, fecha:it.fecha, canal:it.canal||'enlace', comentario:it.comentario||'' };
@@ -1753,9 +1806,12 @@ function pintarPublica(){
     <div class="pub-hero">
       <div class="eyebrow">Segunda Vida</div>
       <h1>${esc(nombre?('Hola, '+nombre):'Tus libros')} 🌿</h1>
-      <p>Estos son los libros que recibimos y el precio de venta que proponemos para cada uno.
-      Si el libro se vende recibes el <b>${S.cfg.pctConsignante}%</b> de ese precio, y la exhibición dura <b>${S.cfg.plazoDias} días</b>.
-      Aprueba los que estés de acuerdo. Si alguno no te convence, márcalo y déjanos tu comentario: lo conversamos.</p>
+      ${ap.tipo === 'regularizacion'
+        ? `<p>Tus libros ya están en exhibición en La Madriguera. Estamos poniendo al día el registro de precios y queremos dejar por escrito tu conformidad con cada uno.
+           Si el libro se vende recibes el <b>${S.cfg.pctConsignante}%</b> de ese precio. Si algún precio no te convence, márcalo y lo conversamos antes de seguir exhibiéndolo.</p>`
+        : `<p>Estos son los libros que recibimos y el precio de venta que proponemos para cada uno.
+           Si el libro se vende recibes el <b>${S.cfg.pctConsignante}%</b> de ese precio, y la exhibición dura <b>${S.cfg.plazoDias} días</b>.
+           Aprueba los que estés de acuerdo. Si alguno no te convence, márcalo y déjanos tu comentario: lo conversamos.</p>`}
     </div>
     ${ap.estado==='completa' ? '<div class="note ok">Ya registramos todas tus respuestas. Gracias.</div>' : ''}
     ${ap.items.map((i,ix)=>`
