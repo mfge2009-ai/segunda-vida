@@ -197,6 +197,50 @@ tr:hover td{background:#FDFCFA}
 .sticky-bar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -6px 24px rgba(43,33,24,.1);z-index:50}
 .sticky-bar .in{max-width:660px;margin:0 auto;display:flex;gap:10px;align-items:center}
 
+/* ---------- barra superior: búsqueda y sincronización ---------- */
+.buscar-top{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:#fff;
+  border-radius:999px;padding:6px 8px 6px 12px;font-size:12.5px;cursor:pointer;min-width:210px}
+.buscar-top span{flex:1;text-align:left;opacity:.8}
+.buscar-top:hover{background:rgba(255,255,255,.2)}
+kbd{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;background:rgba(0,0,0,.08);border:1px solid rgba(0,0,0,.12);border-bottom-width:2px;border-radius:5px;padding:1px 5px;color:inherit;white-space:nowrap}
+.buscar-top kbd{background:rgba(255,255,255,.14);border-color:rgba(255,255,255,.25)}
+.chip-sync{background:none;border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:999px;padding:5px 10px;font-size:11.5px;cursor:pointer;opacity:.9;white-space:nowrap}
+.chip-sync.run{animation:pulso 1.2s ease-in-out infinite}
+.chip-sync.err{background:rgba(179,38,30,.55)}
+@keyframes pulso{50%{opacity:.5}}
+
+/* ---------- buscador global ---------- */
+.pal-bg{position:fixed;inset:0;background:rgba(43,33,24,.45);z-index:150;display:flex;justify-content:center;align-items:flex-start;padding:10vh 16px 16px}
+.pal{background:var(--surface);border-radius:var(--r);width:100%;max-width:620px;box-shadow:0 24px 60px rgba(0,0,0,.3);overflow:hidden}
+.pal input{width:100%;border:0;border-bottom:1px solid var(--line);padding:16px 18px;font-size:16px;outline:none;border-radius:0}
+.pal input:focus{box-shadow:none}
+.pal-list{max-height:56vh;overflow-y:auto;padding:6px}
+.pal-item{display:flex;gap:10px;align-items:center;padding:9px 12px;border-radius:9px;cursor:pointer;font-size:13.5px}
+.pal-item .ic{width:22px;text-align:center;flex:none}
+.pal-item .tx{flex:1;min-width:0}
+.pal-item .tx small{display:block;color:var(--ink-3);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pal-item.on{background:var(--verde-soft)}
+.pal-grp{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink-3);padding:8px 12px 3px;font-weight:650}
+.pal-foot{border-top:1px solid var(--line);padding:8px 14px;font-size:11.5px;color:var(--ink-3);display:flex;gap:14px;flex-wrap:wrap}
+
+/* ---------- ingreso rápido ---------- */
+.cons-sel{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.cons-sel input{flex:1;min-width:240px;font-size:15px}
+.cons-info{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;font-size:12px}
+details.sec{border:1px solid var(--line);border-radius:var(--r-s);margin:12px 0;background:#fff}
+details.sec > summary{cursor:pointer;padding:10px 13px;font-size:12px;font-weight:650;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2);list-style:none;display:flex;align-items:center;gap:8px}
+details.sec > summary::-webkit-details-marker{display:none}
+details.sec > summary::before{content:'▸';transition:transform .15s;color:var(--ink-3)}
+details.sec[open] > summary::before{transform:rotate(90deg)}
+details.sec > summary em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:500;color:var(--ink-3);margin-left:auto;font-size:11.5px}
+details.sec > .in{padding:2px 13px 12px}
+.atajos{font-size:11.5px;color:var(--ink-3);display:flex;gap:12px;flex-wrap:wrap;margin:4px 0 12px}
+.pill-group label .k{font-family:ui-monospace,Menlo,monospace;font-size:10.5px;opacity:.55;margin-right:5px}
+.precio-rapido{display:grid;grid-template-columns:1fr 1fr 1.2fr;gap:12px;align-items:end}
+.precio-rapido .sug{background:var(--surface-2);border-radius:var(--r-s);padding:9px 12px;margin-bottom:11px}
+.precio-rapido .sug .price-big{font-size:26px}
+@media (max-width:640px){ .precio-rapido{grid-template-columns:1fr 1fr} .precio-rapido .sug{grid-column:1/-1} .buscar-top span,.buscar-top kbd{display:none} .buscar-top{min-width:0} }
+
 @media (max-width:640px){
   main{padding:14px 12px 90px}
   .tw{margin:0 -12px;padding:0 12px}
@@ -253,6 +297,8 @@ tr:hover td{background:#FDFCFA}
 <div class="topbar">
   <div class="logo"><b>LA MADRIGUERA</b><span>Segunda Vida · Consignación</span></div>
   <div class="spacer"></div>
+  <button class="buscar-top" onclick="abrirBuscador()" title="Buscar consignante, libro o acción">🔍 <span>Buscar…</span> <kbd>Ctrl K</kbd></button>
+  <button class="chip-sync" id="syncChip" onclick="cargarTodo()" title="Volver a leer la nube y el POS">⟳ Cargando…</button>
   <div class="chip-user" id="chipUser" onclick="irA('ajustes')" style="cursor:pointer"></div>
 </div>
 
@@ -288,7 +334,7 @@ tr:hover td{background:#FDFCFA}
   <div class="hd"><div><h2>Consignantes</h2><p class="sub">Datos, contrato y estado de cuenta de cada persona</p></div><div class="spacer"></div>
     <button class="btn" onclick="abrirConsignante()">+ Nuevo consignante</button></div>
   <div class="filters">
-    <input type="text" id="fCons" placeholder="Buscar por nombre, cédula, teléfono o Instagram…" oninput="pintarConsignantes()">
+    <input type="text" id="fCons" placeholder="Buscar por nombre, cédula, teléfono o Instagram…" oninput="deb(pintarConsignantes)">
     <select id="fConsEstado" onchange="pintarConsignantes()"><option value="">Todos</option><option value="activo">Activos</option><option value="inactivo">Inactivos</option></select>
   </div>
   <div class="card" style="padding:0"><div class="tw"><table><thead><tr>
@@ -300,12 +346,22 @@ tr:hover td{background:#FDFCFA}
 <section class="page" id="p-ingreso">
   <div class="hd"><div><h2>Ingreso de libros</h2><p class="sub">Escanea el ISBN, revisa el estado y define el precio</p></div></div>
 
-  <label class="f" style="max-width:520px"><span>Consignante <em>— selecciona antes de escanear</em></span>
-    <select id="ingCons" onchange="cambioConsignante()"></select></label>
+  <div class="card">
+    <label class="f" style="margin-bottom:0"><span>1 · Consignante <em>— escribe nombre, cédula o código y elige de la lista</em></span>
+      <div class="cons-sel">
+        <input type="text" id="ingConsBusca" list="dlCons" placeholder="Ej: Valentina, 0930…, C-0004" autocomplete="off"
+          oninput="elegirConsDesdeTexto(false)" onchange="elegirConsDesdeTexto(true)"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();elegirConsDesdeTexto(true);}">
+        <button class="btn ghost" onclick="abrirConsignante()">+ Nuevo</button>
+      </div></label>
+    <datalist id="dlCons"></datalist>
+    <select id="ingCons" class="hide" onchange="cambioConsignante()"></select>
+    <div id="ingConsInfo"></div>
+  </div>
 
   <div class="scanbox">
-    <h3>Escanear ISBN</h3>
-    <p>Dispara el lector de código de barras sobre la contratapa, o escribe el ISBN y pulsa Enter. Los datos se completan solos.</p>
+    <h3>2 · Escanear ISBN</h3>
+    <p>Dispara el lector sobre la contratapa. En la ficha: teclas <b>1–4</b> para el estado físico y <b>Enter</b> para guardar; el cursor vuelve aquí solo.</p>
     <div class="inrow">
       <input type="text" id="isbnIn" placeholder="978…" inputmode="numeric" autocomplete="off">
       <button class="btn" onclick="buscarISBN()">Buscar</button>
@@ -323,8 +379,8 @@ tr:hover td{background:#FDFCFA}
     <p class="sub">Libros capturados en esta sesión de ingreso</p>
     <div id="loteLista"></div>
     <div class="row" style="margin-top:12px">
-      <button class="btn" onclick="enviarAAprobacion()">Enviar precios a aprobación</button>
-      <button class="btn ghost" onclick="irA('documentos')">Generar contrato y anexo</button>
+      <button class="btn" onclick="enviarAAprobacion()">3 · Enviar precios a aprobación</button>
+      <button class="btn ghost" onclick="pdfDesdeIngreso()">Descargar contrato + anexo (PDF)</button>
       <button class="btn ghost" onclick="limpiarLote()">Cerrar lote</button>
     </div>
   </div>
@@ -335,7 +391,7 @@ tr:hover td{background:#FDFCFA}
   <div class="hd"><div><h2>Inventario</h2><p class="sub">Todos los libros del programa y su estado</p></div><div class="spacer"></div>
     <button class="btn ghost" onclick="irA('exportar')">Exportar CSV</button></div>
   <div class="filters">
-    <input type="text" id="fInv" placeholder="Buscar por título, autor, ISBN, código o consignante…" oninput="pintarInventario()">
+    <input type="text" id="fInv" placeholder="Buscar por título, autor, ISBN, código o consignante…" oninput="INV_LIM=200;deb(pintarInventario)">
     <select id="fInvEstado" onchange="pintarInventario()"></select>
     <select id="fInvCons" onchange="pintarInventario()"></select>
     <select id="fInvCat" onchange="pintarInventario()"></select>
@@ -455,7 +511,7 @@ tr:hover td{background:#FDFCFA}
   </div>
   <div class="card">
     <h3>Fórmula de precio sugerido</h3>
-    <p class="sub">Precio sugerido = precio de referencia × estado × demanda × antigüedad × edición × rotación</p>
+    <p class="sub">Precio sugerido = precio de referencia × estado × demanda × antigüedad × edición × disponibilidad</p>
     <div id="cfgFactores"></div>
   </div>
   <div class="card">
@@ -529,7 +585,7 @@ const COL = {
   cfg:   PREFIJO + 'config',
   meta:  PREFIJO + 'meta'
 };
-const LS = { cfg:'sv_fbcfg', local:'sv_local', modo:'sv_modo' };
+const LS = { cfg:'sv_fbcfg', local:'sv_local', modo:'sv_modo', tab:'sv_tab', est:'sv_ultimo_estado', ingCons:'sv_ing_cons' };
 
 /* ---------------- estado ---------------- */
 const S = {
@@ -604,6 +660,9 @@ function nombreCons(c){ return c ? ((c.nombres||'') + ' ' + (c.apellidos||'')).t
 function consPorId(id){ return S.cons.find(c=>c.id===id); }
 function libroPorId(id){ return S.libros.find(l=>l.id===id); }
 function redondear(v){ const r = Number(S.cfg.redondeo)||0; if(!r) return Math.round(v*100)/100; return Math.round(v/r)*r; }
+/* Espera a que se deje de teclear para filtrar tablas largas */
+let DEB_T = null;
+function deb(fn, ms){ clearTimeout(DEB_T); DEB_T = setTimeout(fn, ms||140); }
 function limpiarISBN(s){ return String(s||'').replace(/[^0-9Xx]/g,'').toUpperCase(); }
 
 /* ============================ CAPA DE DATOS ============================
@@ -615,14 +674,14 @@ const Local = {
 };
 
 const DB = {
-  async lista(col){
+  async lista(col, fuente){
     if (S.modo === 'local'){ const d = Local.leer(); return (d[col]||[]).slice(); }
-    const snap = await S.db.collection(col).get();
+    const snap = await S.db.collection(col).get(fuente ? { source:fuente } : undefined);
     return snap.docs.map(x => ({ id:x.id, ...x.data() }));
   },
-  async obtener(col,id){
+  async obtener(col,id,fuente){
     if (S.modo === 'local'){ const d = Local.leer(); return (d[col]||[]).find(x=>x.id===id) || null; }
-    const doc = await S.db.collection(col).doc(id).get();
+    const doc = await S.db.collection(col).doc(id).get(fuente ? { source:fuente } : undefined);
     return doc.exists ? { id:doc.id, ...doc.data() } : null;
   },
   async guardar(col, obj){
@@ -676,17 +735,48 @@ async function iniciar(){
   const modo = localStorage.getItem(LS.modo);
   if (modo === 'local'){ S.modo = 'local'; return arrancarApp(); }
 
-  const cfg = FIREBASE_CONFIG_FIJA || leerCfgGuardada();
+  let cfg = FIREBASE_CONFIG_FIJA || leerCfgGuardada();
+  if (!cfg) cfg = await detectarConfigDelPOS();
   if (!cfg){ $('#gateWait').classList.add('hide'); $('#gateSetup').classList.remove('hide'); return; }
   conectarFirebase(cfg);
 }
 
 function leerCfgGuardada(){ try { return JSON.parse(localStorage.getItem(LS.cfg)); } catch(e){ return null; } }
 
+/* La configuración de Firebase no es un secreto: viaja dentro de cualquier app
+   web. El POS está publicado en este mismo dominio, así que Segunda Vida la lee
+   de ahí la primera vez y ya nadie tiene que pegarla, ni el equipo ni el
+   consignante que abre el enlace de aprobación desde su celular. */
+const RUTAS_POS = ['../madriguera-pos/index.html', '/madriguera-pos/index.html', './madriguera-pos/index.html'];
+
+async function detectarConfigDelPOS(){
+  const campos = ['apiKey','authDomain','projectId','storageBucket','messagingSenderId','appId','measurementId'];
+  for (const ruta of RUTAS_POS){
+    try{
+      const r = await fetch(ruta, { cache:'no-store' });
+      if (!r.ok) continue;
+      const t = await r.text();
+      const cfg = {};
+      campos.forEach(k => {
+        const m = t.match(new RegExp(k + '\\s*:\\s*["\']([^"\']+)["\']'));
+        if (m) cfg[k] = m[1];
+      });
+      if (cfg.apiKey && cfg.projectId){
+        try { localStorage.setItem(LS.cfg, JSON.stringify(cfg)); } catch(e){}
+        return cfg;
+      }
+    }catch(e){ /* se prueba la siguiente ruta */ }
+  }
+  return null;
+}
+
 function conectarFirebase(cfg){
   try{
     if (!firebase.apps.length) firebase.initializeApp(cfg);
     S.db = firebase.firestore(); S.auth = firebase.auth(); S.modo = 'nube';
+    // Copia local en el navegador: la segunda vez que se abre, los datos salen
+    // del disco al instante y luego se actualizan desde la nube.
+    try { S.db.enablePersistence({ synchronizeTabs:true }).catch(()=>{}); } catch(e){}
   }catch(e){
     $('#gateWait').classList.add('hide'); $('#gateSetup').classList.remove('hide');
     toast('No se pudo conectar con Firebase: ' + e.message, 'err'); return;
@@ -748,48 +838,101 @@ async function salir(){
   await S.auth.signOut(); location.reload();
 }
 
+/* Arranque en tres tiempos, para que la pantalla aparezca de inmediato:
+   1. copia local del navegador (instantánea, si ya se abrió antes en este equipo)
+   2. datos frescos de la nube
+   3. en segundo plano: aprobaciones y ventas del POS, sin bloquear la pantalla */
 async function arrancarApp(){
   $('#gate').classList.add('hide');
   $('#app').classList.remove('hide');
-  await cargarTodo();
   construirNav();
-  pintarTodo();
+  estadoSync('Cargando…', 'run');
+  const pestana = (()=>{ try { return localStorage.getItem(LS.tab) || 'panel'; } catch(e){ return 'panel'; } })();
+  let pintado = false;
+  if (S.modo === 'nube'){
+    const rapido = await leerColecciones('cache').catch(()=>null);
+    if (rapido && (rapido.cons.length || rapido.libros.length)){ aplicarDatos(rapido); irA(pestana, true); pintado = true; }
+  }
+  try { aplicarDatos(await leerColecciones()); }
+  catch(e){ if (!S.cfg) S.cfg = normalizarCfg(null); toast('No se pudieron leer los datos: ' + e.message, 'err'); }
+  recalcularVencidos(false);
+  if (!pintado) irA(pestana, true); else pintarTodo();
+  sincronizarEnSegundoPlano();
 }
 
+async function leerColecciones(fuente){
+  const [cons, libros, aprob, cfgDoc] = await Promise.all([
+    DB.lista(COL.cons, fuente), DB.lista(COL.libros, fuente), DB.lista(COL.aprob, fuente),
+    DB.obtener(COL.cfg, 'general', fuente).catch(()=>null)
+  ]);
+  return { cons, libros, aprob, cfgDoc };
+}
+function normalizarCfg(cfgDoc){
+  const cfg = Object.assign({}, CFG_DEF, cfgDoc || {});
+  // Solo se conservan los grupos de factores que la fórmula usa hoy.
+  cfg.factores = {};
+  Object.keys(CFG_DEF.factores).forEach(g => {
+    cfg.factores[g] = Object.assign({}, CFG_DEF.factores[g], (cfgDoc && cfgDoc.factores && cfgDoc.factores[g]) || {});
+  });
+  return cfg;
+}
+function aplicarDatos(d){
+  S.cons = d.cons; S.libros = d.libros; S.aprob = d.aprob;
+  S.cfg = normalizarCfg(d.cfgDoc);
+}
+
+/* Se usa también desde el botón de sincronizar de la barra superior */
 async function cargarTodo(){
-  try{
-    const [cons, libros, aprob, cfgDoc] = await Promise.all([
-      DB.lista(COL.cons), DB.lista(COL.libros), DB.lista(COL.aprob), DB.obtener(COL.cfg,'general')
-    ]);
-    S.cons = cons; S.libros = libros; S.aprob = aprob;
-    S.cfg = Object.assign({}, CFG_DEF, cfgDoc || {});
-    // Solo se conservan los grupos de factores que la fórmula usa hoy.
-    S.cfg.factores = {};
-    Object.keys(CFG_DEF.factores).forEach(g => {
-      S.cfg.factores[g] = Object.assign({}, CFG_DEF.factores[g], (cfgDoc && cfgDoc.factores && cfgDoc.factores[g]) || {});
-    });
-  }catch(e){
-    S.cfg = Object.assign({}, CFG_DEF);
-    toast('No se pudieron leer los datos: ' + e.message, 'err');
-  }
+  try { aplicarDatos(await leerColecciones()); }
+  catch(e){ toast('No se pudieron leer los datos: ' + e.message, 'err'); }
   recalcularVencidos(false);
-  await sincronizarAprobaciones();
-  if (S.modo === 'nube' && S.cfg.sincronizarPOS !== false){
-    await importarVentasPOS(false);
-    await revisarAltasPOS();
-  }
+  pintarTodo();
+  await sincronizarEnSegundoPlano();
+}
+
+let SYNC_EN_CURSO = false;
+async function sincronizarEnSegundoPlano(){
+  if (SYNC_EN_CURSO) return;
+  SYNC_EN_CURSO = true;
+  estadoSync('Sincronizando…', 'run');
+  try{
+    const n = await sincronizarAprobaciones();
+    if (S.modo === 'nube' && S.cfg.sincronizarPOS !== false){
+      // Una sola lectura del documento del POS sirve para ventas y para altas
+      const v = await leerConsignaPOS().catch(()=>null);
+      if (v){ await importarVentasPOS(false, v); await revisarAltasPOS(v); }
+    }
+    pintarTodo();
+    estadoSync('Al día · ' + new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}), 'ok');
+  }catch(e){
+    estadoSync('Sin sincronizar', 'err');
+  }finally{ SYNC_EN_CURSO = false; }
+}
+function estadoSync(txt, tipo){
+  const el = $('#syncChip'); if (!el) return;
+  el.textContent = (tipo==='run' ? '⟳ ' : tipo==='err' ? '⚠ ' : '✓ ') + txt;
+  el.className = 'chip-sync ' + (tipo||'');
 }
 
 function construirNav(){
-  $$('#nav button').forEach(b => b.onclick = () => irA(b.dataset.p));
+  $$('#nav button').forEach((b,i) => { b.onclick = () => irA(b.dataset.p); b.title = 'Alt + ' + (i === 9 ? 0 : i+1); });
   const u = S.modo === 'local' ? 'Modo local' : (S.user ? S.user.email : '');
   $('#chipUser').innerHTML = (S.modo==='local'?'💾 ':'👤 ') + '<b>' + esc(u) + '</b>';
 }
 
-function irA(p){
+let PAG = 'panel';
+function irA(p, inicial){
+  if (!document.getElementById('p-' + p)) p = 'panel';
+  PAG = p;
+  try { localStorage.setItem(LS.tab, p); } catch(e){}
   $$('#nav button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
   $$('.page').forEach(s => s.classList.toggle('on', s.id === 'p-' + p));
-  window.scrollTo({top:0,behavior:'smooth'});
+  if (!inicial) window.scrollTo({top:0,behavior:'smooth'});
+  pintarBadges();
+  pintarPagina(p);
+}
+function pintarPagina(p){
+  if (!S.cfg) return;
   if (p === 'panel') pintarPanel();
   if (p === 'consignantes') pintarConsignantes();
   if (p === 'ingreso') pintarIngreso();
@@ -802,10 +945,16 @@ function irA(p){
   if (p === 'ajustes') pintarAjustes();
 }
 
+/* Antes se redibujaban las diez pestañas en cada cambio; ahora solo la que está
+   a la vista. Las demás se dibujan al entrar en ellas. */
 function pintarTodo(){
-  pintarPanel(); pintarConsignantes(); pintarIngreso(); pintarInventario();
-  pintarAprobaciones(); pintarVentas(); pintarAjustes();
-  llenarSelectCons('docCons'); llenarSelectCons('expCons', true); llenarSelectCons('repCons', true);
+  if (!S.cfg) return;
+  pintarBadges();
+  // Ajustes no se repinta solo: borraría lo que se esté escribiendo en el formulario
+  if (PAG !== 'ajustes') pintarPagina(PAG);
+}
+function pintarBadges(){
+  if (!S.cfg) return;
   const pend = S.aprob.filter(a=>a.estado==='pendiente').length;
   const bg = $('#bgApro'); bg.textContent = pend; bg.classList.toggle('hide', !pend);
 }
@@ -830,8 +979,8 @@ function pintarConsignantes(){
       <td>${porPagar>0?`<b style="color:var(--terra)">${money(porPagar)}</b>`:'—'}</td>
       <td>${c.aceptaTerminos?'<span class="tag t-verde">Aceptados</span>':'<span class="tag t-rojo">Pendiente</span>'}</td>
       <td style="text-align:right;white-space:nowrap">
-        <button class="btn ghost sm" onclick="verConsignante('${c.id}')">Ver</button>
-        <button class="btn ghost sm" onclick="abrirConsignante('${c.id}')">Editar</button>
+        <button class="btn ghost sm" onclick="verConsignante('${c.id}')">Ficha</button>
+        <button class="btn ghost sm" onclick="irIngresoCon('${c.id}')" title="Ingresar libros de esta persona">+ Libros</button>
       </td></tr>`;
   }).join('');
   $('#emptyCons').innerHTML = lista.length ? '' :
@@ -864,7 +1013,8 @@ function abrirConsignante(id){
     {t:'Cancelar', c:'ghost', f:cerrarModal},
     id ? {t:'Eliminar', c:'danger', f:()=>eliminarConsignante(id)} : null,
     {t:'Guardar', f:()=>guardarConsignante(id)}
-  ].filter(Boolean));
+  ].filter(Boolean), { enter:true });
+  if (!id) setTimeout(()=>{ const n = $('#cN'); if (n) n.focus(); }, 100);
 }
 
 async function guardarConsignante(id){
@@ -890,7 +1040,10 @@ async function guardarConsignante(id){
   const saved = await DB.guardar(COL.cons, c);
   const i = S.cons.findIndex(x=>x.id===saved.id);
   if (i>=0) S.cons[i] = saved; else S.cons.push(saved);
-  cerrarModal(); pintarTodo(); toast('Consignante guardado','ok');
+  cerrarModal();
+  // Si se creó desde el ingreso, queda elegido y listo para escanear
+  if (!id && PAG === 'ingreso'){ $('#ingCons').innerHTML += `<option value="${saved.id}"></option>`; $('#ingCons').value = saved.id; cambioConsignante(); }
+  pintarTodo(); toast('Consignante guardado' + (!id ? ' · ' + saved.codigo : ''),'ok');
 }
 
 async function eliminarConsignante(id){
@@ -911,6 +1064,7 @@ function verConsignante(id){
   const vendidos = libros.filter(l => ['vendido','pagado'].includes(l.estado));
   const porPagar = libros.filter(l=>l.estado==='vendido').reduce((s,l)=>s+(l.venta?l.venta.montoConsignante:0),0);
   const pagado = libros.filter(l=>l.estado==='pagado').reduce((s,l)=>s+(l.venta?l.venta.montoConsignante:0),0);
+  const sinEnviar = libros.filter(l=>l.aceptado && ['aceptado','pendiente_aprobacion'].includes(l.estado)).length;
   modal('Ficha de ' + nombreCons(c), `
     <div class="grid g4" style="margin-bottom:14px">
       <div class="kpi"><div class="n">${libros.length}</div><div class="l">Libros</div></div>
@@ -941,9 +1095,17 @@ function verConsignante(id){
       :'<tr><td colspan="6" class="sub" style="padding:16px">Sin libros registrados.</td></tr>'}</tbody></table></div>
   `, [
     {t:'Cerrar', c:'ghost', f:cerrarModal},
-    {t:'Generar contrato', c:'ghost', f:()=>{ cerrarModal(); irA('documentos'); $('#docCons').value = id; previsualizarDoc(); }},
-    {t:'Ingresar libros', f:()=>{ cerrarModal(); irA('ingreso'); $('#ingCons').value = id; cambioConsignante(); }}
-  ]);
+    {t:'Editar datos', c:'ghost', f:()=>abrirConsignante(id)},
+    {t:'Contrato + anexo PDF', c:'ghost', f:()=>descargarPDF(id, 'completo')},
+    sinEnviar ? {t:`Enviar ${sinEnviar} a aprobación`, c:'ghost', f:()=>{ cerrarModal(); enviarAAprobacionDe(id); }} : null,
+    porPagar > 0 ? {t:'Registrar pago ' + money(porPagar), c:'ghost', f:()=>{ cerrarModal(); liquidar(id); }} : null,
+    {t:'Ingresar libros', f:()=>irIngresoCon(id)}
+  ].filter(Boolean));
+}
+
+function irIngresoCon(id){
+  cerrarModal(); irA('ingreso');
+  $('#ingCons').value = id; cambioConsignante();
 }
 
 function llenarSelectCons(elId, conTodos){
@@ -987,21 +1149,19 @@ async function buscarISBN(){
   const isbn = limpiarISBN(raw);
   if (!$('#ingCons').value) return toast('Primero selecciona el consignante','err');
   if (isbn.length < 10) return toast('El ISBN debe tener 10 o 13 dígitos','err');
+  // Antes se frenaba con una ventana de confirmación; ahora se avisa dentro de la ficha
   const yaEsta = S.libros.find(l => limpiarISBN(l.isbn) === isbn && !['retirado','rechazado','pagado'].includes(l.estado));
-  if (yaEsta){
-    const c = consPorId(yaEsta.consignanteId);
-    if (!confirm(`Ya hay un ejemplar de este ISBN en el programa (${yaEsta.codigo} — ${nombreCons(c)}). ¿Ingresar otro ejemplar igual?`)) { $('#isbnIn').value=''; return; }
-  }
-  toast('Buscando el libro…');
-  const r = await consultarISBN(isbn);
-  $('#isbnIn').value = ''; $('#isbnIn').focus();
+  const duplicado = yaEsta ? `Ya hay un ejemplar de este ISBN en el programa: ${yaEsta.codigo} — ${nombreCons(consPorId(yaEsta.consignanteId))} (${(SITUACIONES[yaEsta.estado]||{t:yaEsta.estado}).t}). Si es otro ejemplar, guárdalo normalmente; si no, cancela.` : '';
+  $('#isbnIn').value = ''; $('#isbnIn').disabled = true; $('#isbnIn').placeholder = 'Buscando…';
+  let r;
+  try { r = await consultarISBN(isbn); }
+  finally { $('#isbnIn').disabled = false; $('#isbnIn').placeholder = '978…'; }
   if (!r.datos){
-    toast(r.aviso || 'No se encontró el ISBN. Complétalo a mano.', 'err');
-    abrirLibro(null, true, { isbn });
+    if (r.aviso && /saturad/i.test(r.aviso)) toast(r.aviso, 'err');   // el "no encontrado" ya se explica dentro de la ficha
+    abrirLibro(null, true, { isbn, duplicado });
     return;
   }
-  toast('Datos tomados de ' + r.datos.fuente, 'ok');
-  abrirLibro(null, true, r.datos);
+  abrirLibro(null, true, Object.assign({}, r.datos, { duplicado }));
 }
 
 /* Orden de búsqueda, del más rápido y confiable al más general:
@@ -1232,8 +1392,9 @@ function cerrarCamara(){
 let FOTOS_TMP = [];
 
 function abrirLibro(id, esNuevo, pre){
+  let ultEstado = 'bueno'; try { ultEstado = localStorage.getItem(LS.est) || 'bueno'; } catch(e){}
   const l = id ? Object.assign({}, libroPorId(id)) : Object.assign({
-    estadoFisico:'bueno', aceptado:true, danios:[], fotos:[], edicion:'comun', escasez:'normal'
+    estadoFisico:ultEstado, aceptado:true, danios:[], fotos:[], edicion:'comun', escasez:'normal'
   }, pre||{});
   if (!l.escasez) l.escasez = 'normal';
   if (!l.demanda) l.demanda = DEMANDA_POR_CAT[l.categoria] || 'media';
@@ -1241,81 +1402,102 @@ function abrirLibro(id, esNuevo, pre){
   FOTOS_TMP = (l.fotos||[]).slice();
   const consId = id ? l.consignanteId : $('#ingCons').value;
   const c = consPorId(consId);
+  const nuevo = !id;
 
-  const pillas = (name, obj, val) => Object.entries(obj).map(([k,v])=>
-    `<input type="radio" name="${name}" id="${name}_${k}" value="${k}" ${val===k?'checked':''} onchange="recalc()"><label for="${name}_${k}">${v}</label>`).join('');
+  const pillas = (name, obj, val, numerar) => Object.entries(obj).map(([k,v],i)=>
+    `<input type="radio" name="${name}" id="${name}_${k}" value="${k}" ${val===k?'checked':''} onchange="recalc()"><label for="${name}_${k}">${numerar?`<span class="k">${i+1}</span>`:''}${v}</label>`).join('');
+
+  // Qué secciones se abren solas: las que tienen algo que revisar
+  const faltanDatos = !l.titulo || !l.autor;
+  const tieneDanios = (l.danios||[]).length || l.observaciones || FOTOS_TMP.length;
 
   modal(id ? 'Libro ' + l.codigo : 'Nuevo libro', `
     ${l.estado==='vendido' && l.venta && l.venta.origen==='POS' ? `<div class="note info">Venta registrada en el POS el ${fmtFecha(l.venta.fecha)} por ${money(l.venta.precioVenta)}. Si esa venta se anuló o se borró en el POS, usa <b>Quitar del POS</b> y luego <b>Eliminar</b> para dejar el registro limpio.</div>` : ''}
-    <div class="note ${l.fuente?'ok':'info'}" style="${l.fuente?'':'display:none'}">Datos completados automáticamente desde ${esc(l.fuente||'')}. Revisa y corrige lo que haga falta.</div>
-    <p class="sub" style="margin:-6px 0 12px">Consignante: <b>${esc(nombreCons(c))}</b></p>
+    ${l.duplicado ? `<div class="note warn">${esc(l.duplicado)}</div>` : ''}
+    ${l.fuente ? `<div class="note ok" style="padding:8px 12px">Datos tomados de ${esc(l.fuente)}.</div>` : (nuevo && l.isbn ? '<div class="note info" style="padding:8px 12px">El ISBN no apareció en el POS ni en los catálogos: completa título y precio de referencia.</div>' : '')}
+    <p class="sub" style="margin:-4px 0 10px">Consignante: <b>${esc(nombreCons(c))}</b></p>
 
-    <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin-bottom:9px">Datos del libro</h4>
-    <div class="grid g2">
-      <label class="f"><span>ISBN</span><input type="text" id="lIsbn" class="mono" value="${esc(l.isbn||'')}"></label>
-      <label class="f"><span>Título * <em>— <a href="#" onclick="buscarPorTitulo();return false">completar desde Google Books</a></em></span><input type="text" id="lTit" value="${esc(l.titulo||'')}"></label>
-      <label class="f"><span>Autor</span><input type="text" id="lAut" value="${esc(l.autor||'')}"></label>
-      <label class="f"><span>Editorial</span><input type="text" id="lEd" value="${esc(l.editorial||'')}"></label>
-      <label class="f"><span>Año</span><input type="number" id="lAnio" value="${esc(l.anio||'')}" onchange="autoAntiguedad()"></label>
-      <label class="f"><span>Categoría</span><select id="lCat" onchange="autoDemanda()">
-        <option value="">— Sin categoría —</option>
-        ${CATEGORIAS.map(x=>`<option value="${x}" ${l.categoria===x?'selected':''}>${x}</option>`).join('')}
-      </select></label>
+    <div style="display:flex;gap:12px;align-items:flex-start">
+      <div id="portPrev"></div>
+      <div class="grid g2" style="flex:1">
+        <label class="f"><span>Título * <em>— <a href="#" onclick="buscarPorTitulo();return false">completar desde Google Books</a></em></span><input type="text" id="lTit" value="${esc(l.titulo||'')}"></label>
+        <label class="f"><span>Autor</span><input type="text" id="lAut" value="${esc(l.autor||'')}"></label>
+      </div>
     </div>
-    <label class="f"><span>Descripción breve <em>— se usa en la web</em></span><textarea id="lDesc" style="min-height:60px">${esc(l.descripcion||'')}</textarea></label>
-    <label class="f"><span>URL de portada</span><input type="text" id="lPort" class="mono" value="${esc(l.portadaUrl||'')}" oninput="verPortada()"></label>
-    <div id="portPrev" style="margin:-4px 0 12px"></div>
 
-    <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin:16px 0 9px">Estado físico</h4>
-    <div class="pill-group" style="margin-bottom:12px">${pillas('lEst', ESTADOS_FISICOS, l.estadoFisico)}</div>
-    <label class="f"><span>Daños visibles <em>— marca lo que aplique</em></span>
-      <div class="pill-group" id="lDanios">
+    <label class="f"><span>Estado físico <em>— teclas 1 a 4</em></span>
+      <div class="pill-group">${pillas('lEst', ESTADOS_FISICOS, l.estadoFisico, true)}</div></label>
+
+    <div class="precio-rapido">
+      <label class="f"><span>Precio del libro nuevo (USD) *</span>
+        <input type="number" id="lBase" step="0.5" min="0" value="${l.precioNuevoEst||''}" oninput="recalc()" placeholder="Ej: 18"></label>
+      <label class="f"><span>Precio final de venta</span>
+        <input type="number" id="lFinal" step="0.25" min="0" value="${l.precioFinal||''}" oninput="this.dataset.tocado='1';recalc()"></label>
+      <div class="sug" id="sugRapido"></div>
+    </div>
+    <div id="splitBox"></div>
+    <div id="alertaPrecio"></div>
+
+    <details class="sec" ${faltanDatos && !nuevo ? 'open' : ''}><summary>Más datos del libro <em>ISBN, editorial, año, categoría, portada</em></summary><div class="in">
+      <div class="grid g2">
+        <label class="f"><span>ISBN</span><input type="text" id="lIsbn" class="mono" value="${esc(l.isbn||'')}"></label>
+        <label class="f"><span>Editorial</span><input type="text" id="lEd" value="${esc(l.editorial||'')}"></label>
+        <label class="f"><span>Año</span><input type="number" id="lAnio" value="${esc(l.anio||'')}" onchange="autoAntiguedad()"></label>
+        <label class="f"><span>Categoría</span><select id="lCat" onchange="autoDemanda()">
+          <option value="">— Sin categoría —</option>
+          ${CATEGORIAS.map(x=>`<option value="${x}" ${l.categoria===x?'selected':''}>${x}</option>`).join('')}
+        </select></label>
+      </div>
+      <label class="f"><span>Descripción breve <em>— se usa en la web</em></span><textarea id="lDesc" style="min-height:60px">${esc(l.descripcion||'')}</textarea></label>
+      <label class="f"><span>URL de portada</span><input type="text" id="lPort" class="mono" value="${esc(l.portadaUrl||'')}" oninput="verPortada()"></label>
+    </div></details>
+
+    <details class="sec"><summary>Cómo se calculó el precio <em>demanda, antigüedad, edición, disponibilidad</em></summary><div class="in">
+      <div class="grid g2">
+        <label class="f"><span>Demanda del género</span><div class="pill-group">${pillas('lDem',{alta:'Alta',media:'Media',baja:'Baja'}, l.demanda)}</div></label>
+        <label class="f"><span>Antigüedad</span><div class="pill-group">${pillas('lAnt',{reciente:'Reciente',media:'3 a 10 años',antigua:'11 a 20 años',muy_antigua:'Más de 20'}, l.antiguedad)}</div></label>
+        <label class="f"><span>Edición</span><div class="pill-group">${pillas('lEdi',{especial:'Especial o tapa dura',comun:'Común',bolsillo:'Bolsillo'}, l.edicion)}</div></label>
+        <label class="f"><span>Disponibilidad <em>— ¿se consigue nuevo con facilidad?</em></span><div class="pill-group">${pillas('lEsc',{comun:'Se consigue fácil',normal:'Normal',rara:'Descatalogado o raro'}, l.escasez)}</div></label>
+      </div>
+      <label class="f"><span>Precio mínimo que acepta el consignante <em>— opcional</em></span>
+        <input type="number" id="lMin" step="0.5" min="0" value="${l.precioMinimoCons||''}" oninput="recalc()" style="max-width:200px"></label>
+      <div class="price-panel" id="pricePanel"></div>
+    </div></details>
+
+    <details class="sec" ${tieneDanios ? 'open' : ''}><summary>Daños, observaciones y fotos <em>${(l.danios||[]).length ? (l.danios||[]).length + ' marcado(s)' : 'opcional'}</em></summary><div class="in">
+      <div class="pill-group" id="lDanios" style="margin-bottom:11px">
         ${['Lomo marcado','Tapa doblada','Subrayados','Anotaciones','Páginas sueltas','Manchas','Amarillamiento','Sello o dedicatoria','Sobrecubierta ausente']
           .map((d,i)=>`<input type="checkbox" id="dn${i}" value="${d}" ${(l.danios||[]).includes(d)?'checked':''}><label for="dn${i}">${d}</label>`).join('')}
-      </div></label>
-    <label class="f"><span>Observaciones</span><textarea id="lObs" style="min-height:54px">${esc(l.observaciones||'')}</textarea></label>
-    <label class="f"><span>Fotos del libro <em>— hasta 3, se comprimen solas</em></span>
-      <input type="file" accept="image/*" capture="environment" multiple onchange="agregarFotos(this)">
-      <div class="thumbs" id="thumbs"></div></label>
+      </div>
+      <label class="f"><span>Observaciones</span><textarea id="lObs" style="min-height:54px">${esc(l.observaciones||'')}</textarea></label>
+      <label class="f"><span>Fotos del libro <em>— hasta 3, se comprimen solas</em></span>
+        <input type="file" accept="image/*" capture="environment" multiple onchange="agregarFotos(this)">
+        <div class="thumbs" id="thumbs"></div></label>
+    </div></details>
 
-    <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin:16px 0 9px">Aceptación</h4>
     <label class="check"><input type="checkbox" id="lAcep" ${l.aceptado!==false?'checked':''} onchange="toggleRechazo()">
       <span>El libro <b>se acepta</b> en el programa. Desmárcalo si se devuelve al consignante.</span></label>
     <label class="f ${l.aceptado===false?'':'hide'}" id="wrapRech"><span>Motivo del rechazo</span>
       <select id="lMot">${['Humedad, hongos u olor','Páginas faltantes o sueltas','Subrayados o anotaciones extensas','Daño estructural (lomo, tapas)','Edición fotocopiada o pirata','Contenido no acorde a la curaduría','Género sin demanda','Sin espacio de exhibición']
         .map(m=>`<option ${l.motivoRechazo===m?'selected':''}>${m}</option>`).join('')}</select></label>
-
-    <h4 style="font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-3);margin:16px 0 9px">Precio</h4>
-    <div class="grid g2">
-      <label class="f"><span>Precio de referencia del libro nuevo (USD) *</span>
-        <input type="number" id="lBase" step="0.5" min="0" value="${l.precioNuevoEst||''}" oninput="recalc()" placeholder="Ej: 18.00"></label>
-      <label class="f"><span>Precio mínimo que acepta el consignante <em>— opcional</em></span>
-        <input type="number" id="lMin" step="0.5" min="0" value="${l.precioMinimoCons||''}" oninput="recalc()"></label>
-    </div>
-    <div class="grid g2">
-      <label class="f"><span>Demanda del género</span><div class="pill-group">${pillas('lDem',{alta:'Alta',media:'Media',baja:'Baja'}, l.demanda)}</div></label>
-      <label class="f"><span>Antigüedad</span><div class="pill-group">${pillas('lAnt',{reciente:'Reciente',media:'3 a 10 años',antigua:'11 a 20 años',muy_antigua:'Más de 20'}, l.antiguedad)}</div></label>
-      <label class="f"><span>Edición</span><div class="pill-group">${pillas('lEdi',{especial:'Especial o tapa dura',comun:'Común',bolsillo:'Bolsillo'}, l.edicion)}</div></label>
-      <label class="f"><span>Disponibilidad <em>— ¿se consigue nuevo con facilidad?</em></span><div class="pill-group">${pillas('lEsc',{comun:'Se consigue fácil',normal:'Normal',rara:'Descatalogado o raro'}, l.escasez)}</div></label>
-    </div>
-    <div class="price-panel" id="pricePanel"></div>
-    <label class="f" style="margin-top:12px"><span>Precio final de venta <em>— puedes ajustarlo antes de enviarlo a aprobación</em></span>
-      <input type="number" id="lFinal" step="0.25" min="0" value="${l.precioFinal||''}" oninput="this.dataset.tocado='1';verSplit()"></label>
-    <div id="splitBox"></div>
+    <div class="atajos"><span><kbd>1</kbd>–<kbd>4</kbd> estado físico</span><span><kbd>Enter</kbd> guardar</span><span><kbd>Esc</kbd> cancelar</span></div>
   `, [
     {t:'Cancelar', c:'ghost', f:()=>{cerrarModal();}},
     id && (l.posLibroId || l.origenPOS) ? {t:'Quitar del POS', c:'ghost', f:()=>quitarDelPOSConAviso(l, false)} : null,
     id ? {t:'Eliminar', c:'danger', f:()=>eliminarLibro(id)} : null,
     {t: id?'Guardar cambios':'Guardar y seguir escaneando', f:()=>guardarLibro(id, consId, l)}
-  ].filter(Boolean));
+  ].filter(Boolean), { enter:true, atajosEstado:true });
 
   pintarThumbs(); verPortada();
   // Un libro ya guardado conserva el precio que se le puso; uno nuevo sigue al sugerido.
   if (id && l.precioFinal){ const f = $('#lFinal'); f.value = l.precioFinal; f.dataset.tocado = '1'; }
   recalc();
-  // ingreso rápido: si no hay título todavía, el cursor arranca ahí
-  if (!id && !l.titulo) setTimeout(()=>{ const t=$('#lTit'); if(t) t.focus(); }, 120);
-  else if (!id && !l.precioNuevoEst) setTimeout(()=>{ const t=$('#lBase'); if(t) t.focus(); }, 120);
+  // El cursor va a lo único que falta; si no falta nada, basta con 1–4 y Enter
+  setTimeout(()=>{
+    if (id) return;
+    const t = !l.titulo ? $('#lTit') : (!l.precioNuevoEst ? $('#lBase') : null);
+    if (t) t.focus(); else { const m = $('#modales .modal'); if (m){ m.setAttribute('tabindex','-1'); m.focus(); } }
+  }, 120);
 }
 
 function autoDemanda(){ const cat = $('#lCat').value; const d = DEMANDA_POR_CAT[cat]; if (d){ const el = $('#lDem_'+d); if (el) el.checked = true; } recalc(); }
@@ -1336,14 +1518,17 @@ function recalc(){
   const r = calcularPrecio(tmp);
   const minCons = parseFloat($('#lMin').value)||0;
   const alerta = minCons > 0 && r.precio < minCons;
+  const fin0 = $('#lFinal');
+  const editado = fin0 && fin0.dataset.tocado === '1' && Math.abs((parseFloat(fin0.value)||0) - r.precio) > 0.001;
+  $('#sugRapido').innerHTML = `
+    <div style="font-size:10.5px;color:var(--ink-3);font-weight:650;text-transform:uppercase;letter-spacing:.04em">Sugerido</div>
+    <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><div class="price-big">${money(r.precio)}</div>
+    ${editado ? `<a href="#" style="font-size:11.5px" onclick="const f=$('#lFinal');f.value='${r.precio.toFixed(2)}';f.dataset.tocado='';recalc();return false">usar sugerido</a>` : ''}</div>`;
+  $('#alertaPrecio').innerHTML =
+    (r.ajustadoAlMinimo?`<div class="note warn" style="margin:8px 0 0">Se subió al precio mínimo de venta de la librería (${money(S.cfg.precioMinimo)}).</div>`:'') +
+    (alerta?`<div class="note bad" style="margin:8px 0 0">El sugerido queda por debajo del mínimo que pide el consignante (${money(minCons)}). Conversa el precio antes de enviarlo.</div>`:'');
   $('#pricePanel').innerHTML = `
-    <div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">
-      <div><div class="l" style="font-size:11px;color:var(--ink-3);font-weight:650;text-transform:uppercase;letter-spacing:.04em">Precio sugerido</div>
-        <div class="price-big">${money(r.precio)}</div></div>
-      <div class="spacer" style="flex:1"></div>
-      <button type="button" class="btn ghost sm" onclick="const f=$('#lFinal');f.value='${r.precio.toFixed(2)}';f.dataset.tocado='';verSplit()">Volver al sugerido</button>
-    </div>
-    <div style="margin-top:12px">
+    <div>
       <div class="calc-line"><span>Precio de referencia</span><b>${money(r.base)}</b></div>
       <div class="calc-line"><span>Estado físico · ${ESTADOS_FISICOS[tmp.estadoFisico]||'—'}</span><b>× ${r.fe.toFixed(2)}</b></div>
       <div class="calc-line"><span>Demanda del género</span><b>× ${r.fd.toFixed(2)}</b></div>
@@ -1351,10 +1536,8 @@ function recalc(){
       <div class="calc-line"><span>Edición</span><b>× ${r.fi.toFixed(2)}</b></div>
       <div class="calc-line"><span>Disponibilidad · ${({comun:'se consigue fácil',normal:'normal',rara:'descatalogado o raro'})[tmp.escasez]||'—'}</span><b>× ${r.fr.toFixed(2)}</b></div>
       <div class="calc-line"><span>Resultado antes de redondear</span><b>${money(r.bruto)}</b></div>
-    </div>
-    ${r.ajustadoAlMinimo?`<div class="note warn" style="margin:10px 0 0">Se subió al precio mínimo de venta de la librería (${money(S.cfg.precioMinimo)}).</div>`:''}
-    ${alerta?`<div class="note bad" style="margin:10px 0 0">El sugerido queda por debajo del mínimo que pide el consignante (${money(minCons)}). Conversa el precio antes de enviarlo.</div>`:''}
-  `;
+      <div class="calc-line"><span>Precio sugerido (redondeado)</span><b>${money(r.precio)}</b></div>
+    </div>`;
   // Mientras nadie escriba un precio a mano, el final sigue al sugerido:
   // así, si cambias el estado físico o la categoría, el precio se actualiza solo.
   const fin = $('#lFinal');
@@ -1404,12 +1587,14 @@ async function guardarLibro(id, consId, orig){
   const titulo = $('#lTit').value.trim();
   if (!titulo) return toast('El título es obligatorio','err');
   const l = Object.assign({}, orig||{});
+  delete l.duplicado;
   l.consignanteId = consId; l.consignanteNombre = nombreCons(c);
   l.isbn = limpiarISBN($('#lIsbn').value);
   l.titulo = titulo; l.autor = $('#lAut').value.trim(); l.editorial = $('#lEd').value.trim();
   l.anio = $('#lAnio').value.trim(); l.categoria = $('#lCat').value;
   l.descripcion = $('#lDesc').value.trim(); l.portadaUrl = $('#lPort').value.trim();
-  l.estadoFisico = radio('lEst'); l.demanda = radio('lDem'); l.antiguedad = radio('lAnt');
+  l.estadoFisico = radio('lEst'); l.demanda = radio('lDem');
+  if (!id) { try { localStorage.setItem(LS.est, l.estadoFisico); } catch(e){} } l.antiguedad = radio('lAnt');
   l.edicion = radio('lEdi'); l.escasez = radio('lEsc');
   l.danios = $$('#lDanios input:checked').map(x=>x.value);
   l.observaciones = $('#lObs').value.trim();
@@ -1455,8 +1640,18 @@ async function eliminarLibro(id){
 }
 
 /* ============================ INGRESO / LOTE ============================ */
+function etiquetaCons(c){ return nombreCons(c) + (c.codigo ? ' · ' + c.codigo : '') + (c.cedula ? ' · ' + c.cedula : ''); }
+
 function pintarIngreso(){
   llenarSelectCons('ingCons');
+  $('#dlCons').innerHTML = S.cons.slice().sort((a,b)=>nombreCons(a).localeCompare(nombreCons(b)))
+    .map(c=>`<option value="${esc(etiquetaCons(c))}"></option>`).join('');
+  // Se recuerda con quién se estaba trabajando, aunque se recargue la página
+  if (!$('#ingCons').value){
+    let ult = null; try { ult = localStorage.getItem(LS.ingCons); } catch(e){}
+    if (ult && consPorId(ult)) $('#ingCons').value = ult;
+  }
+  pintarInfoCons();
   const ids = S.lote.filter(id => libroPorId(id));
   S.lote = ids;
   $('#loteCount').textContent = ids.length + (ids.length===1?' libro':' libros');
@@ -1482,15 +1677,59 @@ function sacarDelLote(id){ S.lote = S.lote.filter(x=>x!==id); pintarIngreso(); }
 function limpiarLote(){ if (S.lote.length && !confirm('¿Cerrar el lote en curso? Los libros ya guardados se mantienen en el inventario.')) return; S.lote = []; pintarIngreso(); toast('Lote cerrado'); }
 function cambioConsignante(){
   const id = $('#ingCons').value;
+  try { if (id) localStorage.setItem(LS.ingCons, id); } catch(e){}
   if (id && S.lote.length){
+    // El lote cambia solo: los libros ya guardados siguen en el inventario
     const distinto = S.lote.some(x => libroPorId(x) && libroPorId(x).consignanteId !== id);
-    if (distinto && confirm('El lote en curso es de otro consignante. ¿Cerrarlo y empezar uno nuevo?')) S.lote = [];
+    if (distinto){ S.lote = []; toast('Nuevo lote para ' + nombreCons(consPorId(id))); }
   }
   pintarIngreso();
   const el = $('#isbnIn'); if (el && id) el.focus();
 }
 
+/* Buscador del consignante: acepta la opción de la lista, una cédula exacta,
+   un código C-0000 o, si queda una sola coincidencia, la toma. */
+function elegirConsDesdeTexto(final){
+  const txt = ($('#ingConsBusca').value||'').trim().toLowerCase();
+  if (!txt) return;
+  let c = S.cons.find(x => etiquetaCons(x).toLowerCase() === txt)
+       || S.cons.find(x => (x.cedula||'') === txt || (x.codigo||'').toLowerCase() === txt);
+  if (!c && final){
+    const m = S.cons.filter(x => etiquetaCons(x).toLowerCase().includes(txt));
+    if (m.length === 1) c = m[0];
+    else if (!m.length){ toast('No hay un consignante con ese dato. Usa “+ Nuevo”.','err'); return; }
+    else { toast(m.length + ' coincidencias: elige una de la lista','err'); return; }
+  }
+  if (c && c.id !== $('#ingCons').value){ $('#ingCons').value = c.id; cambioConsignante(); }
+  if (c && final) $('#ingConsBusca').value = etiquetaCons(c);
+}
+
+function pintarInfoCons(){
+  const c = consPorId($('#ingCons').value);
+  const inp = $('#ingConsBusca');
+  if (!c){ $('#ingConsInfo').innerHTML = ''; return; }
+  if (document.activeElement !== inp) inp.value = etiquetaCons(c);
+  const L = S.libros.filter(l=>l.consignanteId===c.id);
+  const sinEnviar = L.filter(l=>l.estado==='aceptado').length;
+  const esperando = L.filter(l=>l.estado==='pendiente_aprobacion').length;
+  $('#ingConsInfo').innerHTML = `<div class="cons-info">
+    <span class="tag t-gris">${L.length} libro(s) en total</span>
+    ${sinEnviar?`<span class="tag t-azul">${sinEnviar} sin enviar a aprobación</span>`:''}
+    ${esperando?`<span class="tag t-oro">${esperando} esperando respuesta</span>`:''}
+    ${c.aceptaTerminos?'<span class="tag t-verde">Términos aceptados</span>':`<span class="tag t-rojo">Términos pendientes</span> <a href="#" onclick="abrirConsignante('${c.id}');return false" style="font-size:12px">marcar</a>`}
+    ${c.telefono?`<span class="tag t-gris">${esc(c.telefono)}</span>`:''}
+    <a href="#" onclick="verConsignante('${c.id}');return false" style="font-size:12px;margin-left:4px">Ver ficha</a>
+  </div>`;
+}
+
+function pdfDesdeIngreso(){
+  const id = $('#ingCons').value;
+  if (!id) return toast('Primero elige el consignante','err');
+  descargarPDF(id, 'completo');
+}
+
 /* ============================ INVENTARIO ============================ */
+let INV_LIM = 200;   // filas visibles: con cientos de libros la tabla completa se vuelve lenta
 function pintarInventario(){
   const selEst = $('#fInvEstado');
   if (!selEst.options.length){
@@ -1509,6 +1748,8 @@ function pintarInventario(){
 
   const tot = lista.reduce((s,l)=>s+(l.precioFinal||0),0);
   $('#invResumen').textContent = `${lista.length} libro${lista.length===1?'':'s'} · valor de exhibición ${money(tot)}`;
+  const total = lista.length;
+  lista = lista.slice(0, INV_LIM);
   $('#tbInv').innerHTML = lista.map(l=>{
     const dias = l.fechaLimite ? diasEntre(hoyISO(), l.fechaLimite) : null;
     const venceTxt = !l.fechaLimite ? '—'
@@ -1528,7 +1769,8 @@ function pintarInventario(){
         <button class="btn ghost sm" onclick="menuEstado('${l.id}')">Estado</button>
       </td></tr>`;
   }).join('');
-  $('#emptyInv').innerHTML = lista.length ? '' :
+  $('#emptyInv').innerHTML = lista.length ? (total > lista.length
+      ? `<div class="empty" style="padding:14px">Mostrando ${lista.length} de ${total}. <button class="btn ghost sm" onclick="INV_LIM+=300;pintarInventario()">Mostrar más</button> o afina la búsqueda.</div>` : '') :
     `<div class="empty"><b>Sin libros con esos filtros</b>Cambia los filtros o ingresa libros nuevos desde la pestaña de ingreso.</div>`;
 }
 function marcarTodos(chk){ $$('.chkInv').forEach(c=>c.checked = chk.checked); }
@@ -1597,8 +1839,8 @@ async function recalcularVencidos(guardar){
 }
 
 /* ============================ APROBACIÓN DE PRECIOS ============================ */
-async function enviarAAprobacion(){
-  const consId = $('#ingCons').value;
+async function enviarAAprobacion(){ return enviarAAprobacionDe($('#ingCons').value); }
+async function enviarAAprobacionDe(consId){
   if (!consId) return toast('Selecciona el consignante','err');
   const c = consPorId(consId);
   const libros = S.libros.filter(l => l.consignanteId === consId && l.aceptado &&
@@ -1776,8 +2018,9 @@ async function arrancarVistaPublica(token){
   const modo = localStorage.getItem(LS.modo);
   if (modo === 'local'){ S.modo = 'local'; }
   else {
-    const cfg = FIREBASE_CONFIG_FIJA || leerCfgGuardada();
-    if (!cfg){ $('#pubBody').innerHTML = '<div class="empty"><b>Enlace no disponible</b>Pide a La Madriguera que te reenvíe el enlace.</div>'; return; }
+    let cfg = FIREBASE_CONFIG_FIJA || leerCfgGuardada();
+    if (!cfg) cfg = await detectarConfigDelPOS();
+    if (!cfg){ $('#pubBody').innerHTML = '<div class="empty"><b>No pudimos abrir tus libros</b>Escríbenos por WhatsApp o Instagram y te ayudamos.</div>'; return; }
     try{
       if (!firebase.apps.length) firebase.initializeApp(cfg);
       S.db = firebase.firestore(); S.modo = 'nube';
@@ -1955,7 +2198,7 @@ function abrirVenta(id){
       <label class="f"><span>Nota <em>— opcional</em></span><input type="text" id="vNota"></label>
     </div>
     <div id="splitVenta"></div>
-  `, [{t:'Cancelar',c:'ghost',f:cerrarModal},{t:'Registrar venta',f:()=>confirmarVenta(id)}]);
+  `, [{t:'Cancelar',c:'ghost',f:cerrarModal},{t:'Registrar venta',f:()=>confirmarVenta(id)}], { enter:true });
   vistaSplitVenta();
 }
 function vistaSplitVenta(){
@@ -2211,7 +2454,9 @@ async function verEstadoPOS(){
 }
 
 /* ============================ MODAL ============================ */
-function modal(titulo, cuerpo, botones){
+let MODAL_OPC = {};
+function modal(titulo, cuerpo, botones, opc){
+  MODAL_OPC = opc || {};
   const html = `<div class="modal-bg" onclick="if(event.target===this)cerrarModal()"><div class="modal">
     <header><h3>${esc(titulo)}</h3><button class="x" onclick="cerrarModal()">×</button></header>
     <div class="body">${cuerpo}</div>
@@ -2240,8 +2485,38 @@ function modal(titulo, cuerpo, botones){
   });
   document.body.style.overflow = 'hidden';
 }
-function cerrarModal(){ $('#modales').innerHTML = ''; document.body.style.overflow = ''; }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+function cerrarModal(){
+  const habia = !!$('#modales').innerHTML;
+  $('#modales').innerHTML = ''; document.body.style.overflow = ''; MODAL_OPC = {};
+  // En el ingreso, al cerrar una ficha el lector queda listo para el siguiente libro
+  if (habia && PAG === 'ingreso') setTimeout(()=>{ const el = $('#isbnIn'); if (el && !$('#modales').innerHTML) el.focus(); }, 60);
+}
+/* El botón principal es el último del pie que no sea "ghost" ni "danger" */
+function botonPrincipal(){
+  const bs = $$('#modalFoot button').filter(b => !b.classList.contains('ghost') && !b.classList.contains('danger'));
+  return bs[bs.length-1] || null;
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape'){ if ($('.pal-bg')) return cerrarBuscador(); return cerrarModal(); }
+  if (!$('#modales').innerHTML) return;
+  const el = document.activeElement, tag = el ? el.tagName : '';
+  const escribiendo = tag === 'TEXTAREA' || (tag === 'INPUT' && !['checkbox','radio','file'].includes(el.type)) || tag === 'SELECT';
+  // 1–4: estado físico (Alt+1–4 funciona incluso escribiendo en un campo)
+  const dig = /^Digit([1-4])$/.exec(e.code||'') || /^Numpad([1-4])$/.exec(e.code||'');
+  if (MODAL_OPC.atajosEstado && dig && !e.ctrlKey && !e.metaKey && (!escribiendo || e.altKey)){
+    const k = Object.keys(ESTADOS_FISICOS)[Number(dig[1])-1];
+    const r = document.getElementById('lEst_' + k);
+    if (r){ e.preventDefault(); r.checked = true; recalc(); }
+    return;
+  }
+  // Enter: guardar. En un cuadro de texto largo hace falta Ctrl+Enter.
+  if (MODAL_OPC.enter && e.key === 'Enter' && !e.shiftKey){
+    if (tag === 'TEXTAREA' && !(e.ctrlKey || e.metaKey)) return;
+    if (tag === 'BUTTON' || tag === 'A' || tag === 'SUMMARY') return;
+    const b = botonPrincipal();
+    if (b && !b.disabled){ e.preventDefault(); b.click(); }
+  }
+});
 
 
 /* ====================== CONEXIÓN CON EL POS ======================
@@ -2371,11 +2646,11 @@ async function quitarDelPOSConAviso(l, silencioso){
 }
 
 /* --- POS  →  Segunda Vida: ventas --- */
-async function importarVentasPOS(avisar){
+async function importarVentasPOS(avisar, vPrevio){
   if (S.modo !== 'nube') { if (avisar) toast('Disponible solo con la app conectada a la nube','err'); return 0; }
   let n = 0;
   try{
-    const v = await leerConsignaPOS();
+    const v = vPrevio || await leerConsignaPOS();
     for (const pl of v.libros){
       if (pl.estado !== 'vendido') continue;
       const l = S.libros.find(x => x.posLibroId === pl.id || (x.codigo && x.codigo === pl.code));
@@ -2415,10 +2690,10 @@ async function importarVentasPOS(avisar){
 
 /* Vigila que nadie dé de alta libros por el POS: Segunda Vida es la única puerta
    de entrada, porque es la que deja contrato y aprobación de precio. */
-async function revisarAltasPOS(){
+async function revisarAltasPOS(vPrevio){
   if (S.modo !== 'nube' || S.cfg.sincronizarPOS === false){ S.altasPOS = []; return 0; }
   try{
-    const v = await leerConsignaPOS();
+    const v = vPrevio || await leerConsignaPOS();
     S.altasPOS = v.libros.filter(pl => !S.libros.some(x => x.posLibroId === pl.id || x.codigo === pl.code));
   }catch(e){ S.altasPOS = []; }
   return S.altasPOS.length;
@@ -2583,12 +2858,14 @@ function previsualizarDoc(){
 
 function imprimirDoc(){ if (!$('#docCons').value) return toast('Selecciona un consignante','err'); window.print(); }
 
-function descargarPDF(){
-  const id = $('#docCons').value;
+/* Sin argumentos usa lo elegido en la pestaña Documentos; con argumentos se
+   llama directo desde el ingreso o la ficha del consignante, sin cambiar de pestaña. */
+function descargarPDF(idDirecto, tipoDirecto){
+  const id = (typeof idDirecto === 'string' && idDirecto) || $('#docCons').value;
   if (!id) return toast('Selecciona un consignante','err');
   if (!window.jspdf) return toast('No se pudo cargar el generador de PDF. Revisa tu conexión.','err');
   const { jsPDF } = window.jspdf;
-  const c = consPorId(id), cfg = S.cfg, tipo = $('#docTipo').value;
+  const c = consPorId(id), cfg = S.cfg, tipo = tipoDirecto || $('#docTipo').value;
   const libros = librosDelContrato(id);
   const doc = new jsPDF({ unit:'pt', format:'a4' });
   const M = 52, W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
@@ -2675,7 +2952,7 @@ function descargarPDF(){
   pie();
   const nom = (tipo==='precios'?'precios':tipo==='anexo'?'anexo':'contrato') + '-segunda-vida-' + (c.cedula||nombreCons(c).replace(/\s+/g,'-').toLowerCase()) + '.pdf';
   doc.save(nom);
-  toast('PDF generado','ok');
+  toast((cfg.ruc && cfg.representante) ? 'PDF generado' : 'PDF generado · faltan RUC y representante en Ajustes', 'ok');
 }
 
 /* ============================ EXPORTAR CSV ============================ */
@@ -2814,6 +3091,92 @@ async function cargarDemo(){
   pintarTodo(); irA('inventario');
   toast('Datos de ejemplo cargados','ok');
 }
+
+/* ============================ BUSCADOR GLOBAL ============================
+   Ctrl+K (o la tecla /) abre un buscador que encuentra consignantes, libros y
+   acciones desde cualquier pestaña: se llega a todo sin saber dónde está.      */
+const ACCIONES = [
+  ['📥','Ingresar libros','ingreso', ()=>irA('ingreso')],
+  ['👤','Nuevo consignante','alta registrar persona', ()=>abrirConsignante()],
+  ['🏠','Panel','inicio resumen', ()=>irA('panel')],
+  ['👥','Consignantes','personas lista', ()=>irA('consignantes')],
+  ['📚','Inventario','libros stock', ()=>irA('inventario')],
+  ['✅','Aprobaciones de precio','enlace whatsapp', ()=>irA('aprobaciones')],
+  ['💵','Ventas y pagos','liquidar vender pagar', ()=>irA('ventas')],
+  ['📄','Documentos','contrato anexo pdf', ()=>irA('documentos')],
+  ['⬇️','Exportar CSV','pos web descargar', ()=>irA('exportar')],
+  ['📊','Reportes','rotación estadísticas', ()=>irA('reportes')],
+  ['⚙️','Ajustes','configuración fórmula', ()=>irA('ajustes')],
+  ['⟳','Sincronizar con el POS ahora','ventas pos actualizar', ()=>cargarTodo()]
+];
+let PAL = { items:[], ix:0 };
+
+function abrirBuscador(){
+  if ($('.pal-bg') || !S.cfg) return;
+  const bg = document.createElement('div');
+  bg.className = 'pal-bg';
+  bg.innerHTML = `<div class="pal">
+    <input type="text" id="palIn" placeholder="Busca un consignante, un libro (título, ISBN, SV-…) o una acción" autocomplete="off">
+    <div class="pal-list" id="palList"></div>
+    <div class="pal-foot"><span><kbd>↑</kbd><kbd>↓</kbd> moverse</span><span><kbd>Enter</kbd> abrir</span><span><kbd>Esc</kbd> cerrar</span><span><kbd>Alt</kbd>+<kbd>1</kbd>…<kbd>0</kbd> pestañas</span></div>
+  </div>`;
+  bg.onclick = e => { if (e.target === bg) cerrarBuscador(); };
+  document.body.appendChild(bg);
+  const inp = $('#palIn');
+  inp.oninput = () => { PAL.ix = 0; pintarBuscador(); };
+  inp.onkeydown = e => {
+    if (e.key === 'ArrowDown'){ e.preventDefault(); PAL.ix = Math.min(PAL.ix+1, PAL.items.length-1); marcarPal(); }
+    else if (e.key === 'ArrowUp'){ e.preventDefault(); PAL.ix = Math.max(PAL.ix-1, 0); marcarPal(); }
+    else if (e.key === 'Enter'){ e.preventDefault(); ejecutarPal(PAL.ix); }
+  };
+  pintarBuscador(); inp.focus();
+}
+function cerrarBuscador(){ const b = $('.pal-bg'); if (b) b.remove(); }
+
+function pintarBuscador(){
+  const q = ($('#palIn').value||'').toLowerCase().trim();
+  const qi = limpiarISBN(q);
+  const grupos = [];
+  const acc = ACCIONES.filter(a => !q || (a[1]+' '+a[2]).toLowerCase().includes(q)).slice(0, q ? 5 : 12)
+    .map(a => ({ ic:a[0], t:a[1], s:'', f:a[3] }));
+  if (q){
+    const cons = S.cons.filter(c => [nombreCons(c),c.cedula,c.telefono,c.codigo,c.instagram,c.email].join(' ').toLowerCase().includes(q))
+      .slice(0,6).map(c => {
+        const n = S.libros.filter(l=>l.consignanteId===c.id).length;
+        return { ic:'👤', t:nombreCons(c), s:`${c.codigo||''} · ${c.cedula||''} · ${n} libro(s)`, f:()=>verConsignante(c.id) };
+      });
+    const lib = S.libros.filter(l => [l.titulo,l.autor,l.codigo,l.consignanteNombre].join(' ').toLowerCase().includes(q)
+        || (qi.length >= 6 && limpiarISBN(l.isbn).includes(qi)))
+      .slice(0,8).map(l => ({ ic:'📕', t:l.titulo, s:`${l.codigo} · ${l.consignanteNombre||''} · ${money(l.precioFinal)} · ${(SITUACIONES[l.estado]||{t:''}).t}`, f:()=>abrirLibro(l.id) }));
+    if (cons.length) grupos.push(['Consignantes', cons]);
+    if (lib.length) grupos.push(['Libros', lib]);
+  }
+  if (acc.length) grupos.push([q ? 'Acciones' : 'Ir a…', acc]);
+  PAL.items = grupos.flatMap(g => g[1]);
+  let k = 0;
+  $('#palList').innerHTML = PAL.items.length ? grupos.map(([g, its]) => `<div class="pal-grp">${g}</div>` + its.map(it => {
+    const i = k++;
+    return `<div class="pal-item" data-i="${i}" onmousemove="PAL.ix=${i};marcarPal()" onclick="ejecutarPal(${i})">
+      <span class="ic">${it.ic}</span><span class="tx">${esc(it.t)}${it.s?`<small>${esc(it.s)}</small>`:''}</span></div>`;
+  }).join('')).join('') : '<div class="empty" style="padding:22px">Sin resultados</div>';
+  marcarPal();
+}
+function marcarPal(){ $$('.pal-item').forEach(el => el.classList.toggle('on', Number(el.dataset.i) === PAL.ix)); const on = $('.pal-item.on'); if (on) on.scrollIntoView({block:'nearest'}); }
+function ejecutarPal(i){ const it = PAL.items[i]; if (!it) return; cerrarBuscador(); it.f(); }
+
+document.addEventListener('keydown', e => {
+  if (!S.cfg || $('#app').classList.contains('hide')) return;
+  const el = document.activeElement, tag = el ? el.tagName : '';
+  const escribiendo = ['INPUT','TEXTAREA','SELECT'].includes(tag);
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k'){ e.preventDefault(); return abrirBuscador(); }
+  if (e.key === '/' && !escribiendo && !$('#modales').innerHTML){ e.preventDefault(); return abrirBuscador(); }
+  // Alt+1…0: pestañas en el orden de la barra
+  const dg = /^Digit([0-9])$/.exec(e.code||'');
+  if (e.altKey && dg && !$('#modales').innerHTML && !$('.pal-bg')){
+    const bs = $$('#nav button'); const b = bs[dg[1] === '0' ? 9 : Number(dg[1])-1];
+    if (b){ e.preventDefault(); irA(b.dataset.p); }
+  }
+});
 
 /* ============================ ENGANCHES FINALES ============================ */
 document.addEventListener('keydown', e => {
