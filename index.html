@@ -300,6 +300,8 @@ details.sec > .in{padding:2px 13px 12px}
   <button class="buscar-top" onclick="abrirBuscador()" title="Buscar consignante, libro o acción">🔍 <span>Buscar…</span> <kbd>Ctrl K</kbd></button>
   <button class="chip-sync" id="syncChip" onclick="cargarTodo()" title="Volver a leer la nube y el POS">⟳ Cargando…</button>
   <div class="chip-user" id="chipUser" onclick="irA('ajustes')" style="cursor:pointer"></div>
+  <button class="chip-user" onclick="irA('ajustes')" title="Ajustes" aria-label="Ajustes"
+    style="cursor:pointer;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.22);color:#fff;font-size:15px;line-height:1;padding:7px 10px">⚙</button>
 </div>
 
 <nav class="nav" id="nav">
@@ -309,10 +311,6 @@ details.sec > .in{padding:2px 13px 12px}
   <button data-p="inventario">Inventario</button>
   <button data-p="aprobaciones">Aprobaciones <span class="badge hide" id="bgApro">0</span></button>
   <button data-p="ventas">Ventas y pagos</button>
-  <button data-p="documentos">Documentos</button>
-  <button data-p="exportar">Exportar</button>
-  <button data-p="reportes">Reportes</button>
-  <button data-p="ajustes">Ajustes</button>
 </nav>
 
 <main>
@@ -321,6 +319,10 @@ details.sec > .in{padding:2px 13px 12px}
 <section class="page on" id="p-panel">
   <div class="hd"><div><h2>Panel</h2><p class="sub" id="panelFecha"></p></div><div class="spacer"></div>
     <button class="btn" onclick="irA('ingreso')">+ Ingresar libros</button></div>
+  <div class="row" style="margin-bottom:14px;gap:6px">
+    <button class="btn sm" id="vistaHoy" onclick="vistaPanel('hoy')">Hoy</button>
+    <button class="btn ghost sm" id="vistaResultados" onclick="vistaPanel('resultados')">Resultados</button>
+  </div>
   <div class="grid g4" id="kpis"></div>
   <div class="grid g2" style="margin-top:14px">
     <div class="card"><h3>Requiere tu atención</h3><p class="sub">Lo que está frenando el flujo hoy</p><div id="panelAlertas"></div></div>
@@ -389,7 +391,8 @@ details.sec > .in{padding:2px 13px 12px}
 <!-- ---------- INVENTARIO ---------- -->
 <section class="page" id="p-inventario">
   <div class="hd"><div><h2>Inventario</h2><p class="sub">Todos los libros del programa y su estado</p></div><div class="spacer"></div>
-    <button class="btn ghost" onclick="irA('exportar')">Exportar CSV</button></div>
+    <button class="btn ghost" onclick="irA('exportar')">Exportar CSV</button>
+    <button class="btn ghost" onclick="irA('documentos')">Contratos y anexos</button></div>
   <div class="filters">
     <input type="text" id="fInv" placeholder="Buscar por título, autor, ISBN, código o consignante…" oninput="INV_LIM=200;deb(pintarInventario)">
     <select id="fInvEstado" onchange="pintarInventario()"></select>
@@ -1081,7 +1084,9 @@ function verConsignante(id){
         <div><b>Instagram:</b> ${esc(c.instagram||'—')}</div>
         <div><b>Dirección:</b> ${esc(c.direccion||'—')}</div>
         <div><b>Forma de pago:</b> ${esc(c.formaPago||'—')} ${esc(c.datosPago?'· '+c.datosPago:'')}</div>
-        <div><b>Términos:</b> ${c.aceptaTerminos?('Aceptados el '+fmtFechaHora(c.fechaAceptacion)):'Pendientes'}</div>
+        <div><b>Contrato:</b> ${(c.contratoElectronico&&c.contratoElectronico.aceptado)
+          ? ('<span class="tag t-verde">Aceptado en línea</span> '+fmtFechaHora(c.contratoElectronico.fecha))
+          : (c.aceptaTerminos?('Aceptados el '+fmtFechaHora(c.fechaAceptacion)):'Pendiente de firma')}</div>
       </div>
       ${c.notas?`<p class="sub" style="margin-top:10px"><b>Notas:</b> ${esc(c.notas)}</p>`:''}
     </div>
@@ -1889,6 +1894,21 @@ async function regularizarAprobacion(consId){
   await crearAprobacion(consId, libros, true);
 }
 
+/* Ecuador: 0992927252 -> 593992927252 */
+function telefonoWhatsapp(tel){
+  let t = String(tel||'').replace(/\D/g,'');
+  if (!t) return '';
+  if (t.startsWith('593')) return t;
+  if (t.startsWith('0')) return '593' + t.slice(1);
+  if (t.length === 9) return '593' + t;
+  return t;
+}
+function abrirWhatsapp(tel, mensaje){
+  const num = telefonoWhatsapp(tel);
+  if (!num) return toast('Este consignante no tiene celular registrado','err');
+  window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(mensaje), '_blank');
+}
+
 function urlAprobacion(token){
   const base = (S.cfg.urlPublica || '').trim() || (location.origin + location.pathname);
   return base.replace(/#.*$/,'') + '#/aprobar/' + token;
@@ -1902,6 +1922,7 @@ function mostrarEnlace(id){
   const msg = `Hola ${(c.nombres||'').split(' ')[0]}, ya revisamos tus libros para Segunda Vida en La Madriguera 🌿
 Te dejamos aquí el detalle con el precio sugerido de cada uno para que lo apruebes o nos digas si prefieres ajustarlo:
 ${url}
+Ahí mismo puedes leer y aceptar el contrato de consignación.
 Recuerda: si el libro se vende recibes el ${S.cfg.pctConsignante}% del precio, y la exhibición es de ${S.cfg.plazoDias} días.`;
   modal('Enlace de aprobación', `
     <p class="sub" style="margin-bottom:12px">${esc(ap.consignanteNombre)} · ${ap.items.length} libro(s) · total ${money(total)}</p>
@@ -1911,7 +1932,8 @@ Recuerda: si el libro se vende recibes el ${S.cfg.pctConsignante}% del precio, y
   `, [
     {t:'Cerrar', c:'ghost', f:cerrarModal},
     {t:'Copiar mensaje', c:'ghost', f:()=>{ navigator.clipboard.writeText(msg).then(()=>toast('Mensaje copiado','ok')); }},
-    {t:'Abrir en tienda', f:()=>{ cerrarModal(); location.hash = '#/aprobar/' + ap.token; location.reload(); }}
+    {t:'Abrir en tienda', c:'ghost', f:()=>{ cerrarModal(); location.hash = '#/aprobar/' + ap.token; location.reload(); }},
+    {t:'Enviar por WhatsApp', f:()=>abrirWhatsapp(c.telefono, msg)}
   ]);
 }
 
@@ -2001,6 +2023,23 @@ async function sincronizarAprobaciones(avisar){
           cambios++;
         }
       }
+      if (ap.contrato && ap.contrato.aceptado){
+        const cc = consPorId(ap.consignanteId);
+        if (cc && !(cc.contratoElectronico && cc.contratoElectronico.aceptado)){
+          cc.aceptaTerminos = true;
+          cc.fechaAceptacion = ap.contrato.fecha || new Date().toISOString();
+          cc.contratoElectronico = {
+            aceptado: true,
+            nombre: ap.contrato.nombre || '',
+            cedula: ap.contrato.cedula || '',
+            fecha: cc.fechaAceptacion,
+            canal: ap.contrato.canal || 'enlace',
+            token: ap.token || ''
+          };
+          await DB.guardar(COL.cons, cc);
+          cambios++;
+        }
+      }
       const pend = (ap.items||[]).some(i=>i.decision==='pendiente');
       if (!pend && ap.estado !== 'completa'){ ap.estado = 'completa'; await DB.guardar(COL.aprob, ap); }
     }
@@ -2065,7 +2104,7 @@ function pintarPublica(){
             <b style="font-size:14.5px;display:block;line-height:1.35">${esc(i.titulo)}</b>
             <small style="color:var(--ink-3)">${esc(i.autor||'')}${i.editorial?' · '+esc(i.editorial):''}</small>
             <div style="margin-top:6px"><span class="tag t-gris">Estado: ${ESTADOS_FISICOS[i.estadoFisico]||'—'}</span></div>
-            ${i.observaciones?`<p class="sub" style="margin-top:6px">${esc(i.observaciones)}</p>`:''}
+            ${(i.observaciones && !/^importado/i.test(i.observaciones))?`<p class="sub" style="margin-top:6px">${esc(i.observaciones)}</p>`:''}
             <div style="margin-top:9px;display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap">
               <div><div style="font-size:11px;color:var(--ink-3);font-weight:650;text-transform:uppercase">Precio de venta</div>
                 <div style="font-size:23px;font-weight:700;color:var(--verde);line-height:1.1">${money(i.precio)}</div></div>
@@ -2095,6 +2134,7 @@ function pintarPublica(){
       <p class="sub" style="margin-top:10px">El pago se realiza dentro de los primeros 5 días hábiles del mes siguiente a la venta, en efectivo o transferencia. Los libros que no se vendan en ${S.cfg.plazoDias} días se coordinan para retiro o extensión del plazo.</p>
     </div>
   `;
+  pintarContratoPublico();
   const falta = ap.items.filter(i=>i.decision==='pendiente').length;
   document.querySelectorAll('.sticky-bar').forEach(e=>e.remove());
   const bar = document.createElement('div');
@@ -2104,6 +2144,62 @@ function pintarPublica(){
       <div class="sub">${falta?('Faltan '+falta+' por responder'):'Ya respondiste todos. ¡Gracias!'}</div></div>
     <button class="btn" onclick="enviarDecisiones()" ${falta===ap.items.length?'disabled':''}>Enviar respuestas</button></div>`;
   document.body.appendChild(bar);
+}
+
+/* El contrato va dentro del mismo enlace: la consignante lee las cláusulas y las
+   acepta escribiendo su nombre y su cédula. Queda registrado con fecha y hora.
+   Es un mensaje de datos con valor probatorio, no una firma electrónica
+   certificada; para montos altos conviene además la firma en el local. */
+function pintarContratoPublico(){
+  const ap = PUB;
+  const firmado = ap.contrato && ap.contrato.aceptado;
+  const cfg = Object.assign({}, CFG_DEF, S.cfg, (ap.condiciones||{}));
+  const datosLibreria = { nombre: (ap.condiciones&&ap.condiciones.libreria) || CFG_DEF.nombre,
+                          ruc: S.cfg.ruc||'', representante:S.cfg.representante||'', ciudad:S.cfg.ciudad||'Guayaquil',
+                          pctConsignante: cfg.pctConsignante, pctLibreria: cfg.pctLibreria,
+                          plazoDias: cfg.plazoDias, diasRetiro: cfg.diasRetiro || 15 };
+  const caja = document.createElement('div');
+  caja.className = 'card';
+  caja.style.marginTop = '16px';
+  caja.innerHTML = firmado ? `
+      <h3>Contrato de consignación</h3>
+      <div class="note ok" style="margin-top:10px">
+        <b>Aceptado el ${fmtFechaHora(ap.contrato.fecha)}</b><br>
+        ${esc(ap.contrato.nombre)} · C.C. ${esc(ap.contrato.cedula)}
+      </div>
+      <p class="sub">Puedes volver a leerlo cuando quieras desde este mismo enlace.</p>
+      <details style="margin-top:10px"><summary style="cursor:pointer;font-size:13.5px;color:var(--verde)">Leer el contrato</summary>
+        <div style="font-size:12.5px;line-height:1.6;margin-top:10px">${textoContratoPublico(datosLibreria)}</div></details>
+    ` : `
+      <h3>Contrato de consignación</h3>
+      <p class="sub">Léelo y acéptalo para que tus libros queden formalmente registrados en el programa.</p>
+      <details style="margin:10px 0" open><summary style="cursor:pointer;font-size:13.5px;color:var(--verde)">Leer el contrato completo <span class="sub" style="font-weight:400">(desplázate dentro del recuadro)</span></summary>
+        <div style="font-size:12.5px;line-height:1.6;margin-top:10px;max-height:260px;overflow-y:auto;border:1px solid var(--line);border-radius:9px;padding:12px">
+          ${textoContratoPublico(datosLibreria)}
+        </div></details>
+      <label class="f"><span>Tu nombre completo</span><input type="text" id="firmaNombre" value="${esc(ap.consignanteNombre||'')}"></label>
+      <label class="f"><span>Tu cédula</span><input type="text" id="firmaCedula" inputmode="numeric" placeholder="0000000000"></label>
+      <label class="check"><input type="checkbox" id="firmaOk">
+        <span>He leído y acepto el contrato de consignación de La Madriguera, con el reparto ${datosLibreria.pctConsignante}% / ${datosLibreria.pctLibreria}% y el plazo de exhibición de ${datosLibreria.plazoDias} días.</span></label>
+      <button class="btn wide" onclick="aceptarContratoPublico()">Aceptar el contrato</button>
+      <p class="sub" style="margin-top:8px">Al aceptar queda registrada la fecha y la hora. Tus libros siguen siendo tuyos hasta que se vendan.</p>`;
+  $('#pubBody').appendChild(caja);
+}
+
+function textoContratoPublico(d){
+  return clausulas({ formaPago:'' }, d).map(([t,x]) =>
+    `<p style="margin:0 0 10px"><b>${esc(t)}</b><br>${esc(x)}</p>`).join('');
+}
+
+async function aceptarContratoPublico(){
+  const nombre = ($('#firmaNombre').value||'').trim();
+  const cedula = ($('#firmaCedula').value||'').replace(/\D/g,'');
+  if (nombre.length < 5) return toast('Escribe tu nombre completo','err');
+  if (cedula.length < 10) return toast('La cédula debe tener 10 dígitos','err');
+  if (!$('#firmaOk').checked) return toast('Marca la casilla para aceptar el contrato','err');
+  PUB.contrato = { aceptado:true, nombre, cedula, fecha:new Date().toISOString(), canal:'enlace' };
+  const ok = await guardarDecisiones(true);
+  if (ok){ toast('Contrato aceptado. ¡Gracias!','ok'); pintarPublica(); }
 }
 
 function decidir(ix, decision){
@@ -2139,6 +2235,7 @@ async function enviarDecisiones(){
       <p>Registramos tus respuestas: ${aprob} libro(s) aprobados. Preparamos tu contrato y los libros pasan a exhibición en La Madriguera.
       Te avisamos por WhatsApp cuando se vendan.</p></div>`;
     document.querySelectorAll('.sticky-bar').forEach(e=>e.remove());
+    pintarContratoPublico();
   }
 }
 
@@ -2254,6 +2351,32 @@ function liquidar(consId){
 
 /* ============================ PANEL ============================ */
 function kpi(n,l,c){ return `<div class="kpi ${c||''}"><div class="n">${n}</div><div class="l">${l}</div></div>`; }
+
+/* Panel y Reportes eran dos pestañas contestando lo mismo. Ahora es una sola
+   con dos vistas: "Hoy" es lo que hay que resolver, "Resultados" es cómo va el
+   programa en un período. */
+function vistaPanel(cual){
+  const resultados = cual === 'resultados';
+  $('#vistaHoy').className = 'btn' + (resultados ? ' ghost' : '') + ' sm';
+  $('#vistaResultados').className = 'btn' + (resultados ? '' : ' ghost') + ' sm';
+  $$('#p-panel > *').forEach(el => {
+    if (el.classList.contains('hd') || el.id === 'vistaHoy') return;
+    if (el.querySelector && el.querySelector('#vistaHoy')) return;
+    el.classList.toggle('hide', resultados);
+  });
+  let caja = $('#panelResultados');
+  if (!caja){
+    caja = document.createElement('div'); caja.id = 'panelResultados';
+    $('#p-panel').appendChild(caja);
+  }
+  caja.classList.toggle('hide', !resultados);
+  if (resultados){
+    const sec = $('#p-reportes');
+    if (sec && sec.parentElement !== caja) caja.appendChild(sec);
+    sec.classList.add('on'); sec.style.display = 'block';
+    llenarSelectCons('repCons', true); pintarReportes();
+  }
+}
 
 function pintarPanel(){
   const L = S.libros;
@@ -2856,6 +2979,15 @@ function previsualizarDoc(){
   $('#docPrev').innerHTML = h;
 }
 
+function fechaHoraLarga(iso){
+  if (!iso) return '';
+  try{
+    const d = new Date(iso);
+    return d.toLocaleDateString('es-EC',{day:'2-digit',month:'long',year:'numeric'}) + ' a las ' +
+           d.toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'});
+  }catch(e){ return String(iso).slice(0,16).replace('T',' '); }
+}
+
 function imprimirDoc(){ if (!$('#docCons').value) return toast('Selecciona un consignante','err'); window.print(); }
 
 /* Sin argumentos usa lo elegido en la pestaña Documentos; con argumentos se
@@ -2912,14 +3044,35 @@ function descargarPDF(idDirecto, tipoDirecto){
     y = doc.lastAutoTable.finalY + 16;
     parrafo('Ambas partes acuerdan someterse a las siguientes cláusulas:', 10, 'normal', 8);
     clausulas(c,cfg).forEach(([t,x]) => { salto(40); parrafo(t, 10, 'bold', 3); parrafo(x, 9.5, 'normal', 9); });
-    salto(90); y += 34;
-    doc.setDrawColor(0); doc.line(M, y, M+190, y); doc.line(W-M-190, y, W-M, y); y += 13;
-    doc.setFontSize(9);
-    doc.text(cfg.nombre, M, y); doc.text(nombreCons(c), W-M-190, y); y += 12;
-    doc.setTextColor(120);
-    doc.text('C.C./RUC: ' + (cfg.ruc||'______________'), M, y);
-    doc.text('C.C.: ' + (c.cedula||'______________'), W-M-190, y);
-    doc.setTextColor(0);
+    const ce = c.contratoElectronico;
+    if (ce && ce.aceptado){
+      salto(120); y += 24;
+      doc.setFillColor(243,238,230); doc.setDrawColor(200,190,175);
+      doc.rect(M, y, W-M*2, 76, 'FD');
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(47,93,74);
+      doc.text('ACEPTADO ELECTRONICAMENTE POR EL CONSIGNANTE', M+10, y+16);
+      doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(60);
+      doc.text(`${ce.nombre||nombreCons(c)}  -  C.C. ${ce.cedula||c.cedula||''}`, M+10, y+30);
+      doc.text(`Fecha y hora de aceptacion: ${fechaHoraLarga(ce.fecha)}`, M+10, y+42);
+      doc.setFontSize(7.5); doc.setTextColor(110);
+      const nota = doc.splitTextToSize('EL CONSIGNANTE revisio el precio de cada libro y acepto expresamente las clausulas de este contrato desde el enlace personal que le envio LA LIBRERIA. Esta aceptacion constituye un mensaje de datos con validez probatoria conforme a la Ley de Comercio Electronico, Firmas Electronicas y Mensajes de Datos del Ecuador. Registro: ' + (ce.canal||'enlace') + (ce.token ? ' / ' + ce.token : ''), W-M*2-20);
+      nota.forEach((l,i)=>doc.text(l, M+10, y+54+i*9));
+      doc.setTextColor(0); y += 94;
+      salto(60);
+      doc.setDrawColor(0); doc.line(M, y, M+190, y); y += 13;
+      doc.setFontSize(9);
+      doc.text(cfg.nombre, M, y); y += 12;
+      doc.setTextColor(120); doc.text('C.C./RUC: ' + (cfg.ruc||'______________'), M, y); doc.setTextColor(0);
+    } else {
+      salto(90); y += 34;
+      doc.setDrawColor(0); doc.line(M, y, M+190, y); doc.line(W-M-190, y, W-M, y); y += 13;
+      doc.setFontSize(9);
+      doc.text(cfg.nombre, M, y); doc.text(nombreCons(c), W-M-190, y); y += 12;
+      doc.setTextColor(120);
+      doc.text('C.C./RUC: ' + (cfg.ruc||'______________'), M, y);
+      doc.text('C.C.: ' + (c.cedula||'______________'), W-M-190, y);
+      doc.setTextColor(0);
+    }
   }
 
   if (tipo === 'completo' || tipo === 'anexo' || tipo === 'precios'){
