@@ -578,7 +578,16 @@ details.sec > .in{padding:2px 13px 12px}
 
 /* ---- 1. Si prefieres dejar la configuración fija en el archivo, pégala aquí
         y la app dejará de pedirla en cada dispositivo. ---- */
-const FIREBASE_CONFIG_FIJA = null; /* ej: { apiKey:"…", authDomain:"…", projectId:"la-madriguera-cb489", appId:"…" } */
+/* 28-oct-2026: fija, para que el enlace del consignante no dependa de leer
+   el archivo del POS (888 KB) desde el celular. No es un secreto. */
+const FIREBASE_CONFIG_FIJA = {
+  apiKey: "AIzaSyBzAwD0HBDhWe7u_1o1toLPJLhiduHVJyo",
+  authDomain: "la-madriguera-cb489.firebaseapp.com",
+  projectId: "la-madriguera-cb489",
+  storageBucket: "la-madriguera-cb489.firebasestorage.app",
+  messagingSenderId: "648077569073",
+  appId: "1:648077569073:web:7b438dfdac9d5fef063910"
+};
 
 const PREFIJO = 'lm_consig_';
 const COL = {
@@ -730,9 +739,8 @@ window.addEventListener('DOMContentLoaded', iniciar);
 
 async function iniciar(){
   // ¿link público de aprobación?  #/aprobar/TOKEN
-  const h = location.hash || '';
-  const mAp = h.match(/#\/aprobar\/([A-Za-z0-9_-]+)/);
-  if (mAp){ return arrancarVistaPublica(mAp[1]); }
+  const tokenPub = tokenDeEnlace();
+  if (tokenPub){ return arrancarVistaPublica(tokenPub); }
 
   $('#gate').classList.remove('hide');
   const modo = localStorage.getItem(LS.modo);
@@ -743,6 +751,20 @@ async function iniciar(){
   if (!cfg){ $('#gateWait').classList.add('hide'); $('#gateSetup').classList.remove('hide'); return; }
   conectarFirebase(cfg);
 }
+
+/* El token llega como ?aprobar=TOKEN (enlaces nuevos: sobrevive a WhatsApp,
+   Instagram y acortadores, que a veces cortan lo que va después de #) o como
+   #/aprobar/TOKEN (enlaces ya enviados). */
+function tokenDeEnlace(){
+  try {
+    const q = new URLSearchParams(location.search).get('aprobar');
+    if (q && /^[A-Za-z0-9_-]+$/.test(q)) return q;
+  } catch(e){}
+  const m = (location.hash || '').match(/#\/?aprobar[\/=]([A-Za-z0-9_-]+)/);
+  return m ? m[1] : null;
+}
+// Si en la misma pestaña cambia el enlace (#/aprobar/…), se recarga para abrirlo
+window.addEventListener('hashchange', () => { if (/aprobar/.test(location.hash)) location.reload(); });
 
 function leerCfgGuardada(){ try { return JSON.parse(localStorage.getItem(LS.cfg)); } catch(e){ return null; } }
 
@@ -1851,6 +1873,11 @@ async function enviarAAprobacionDe(consId){
   const libros = S.libros.filter(l => l.consignanteId === consId && l.aceptado &&
     ['aceptado','pendiente_aprobacion'].includes(l.estado));
   if (!libros.length) return toast('No hay libros aceptados pendientes de enviar','err');
+  // Si ya hay un lote pendiente con exactamente esos libros, se reutiliza su enlace
+  const ids = libros.map(l => l.id).sort().join('|');
+  const previo = S.aprob.find(a => a.consignanteId === consId && a.estado === 'pendiente' &&
+    (a.items||[]).map(i => i.libroId).sort().join('|') === ids);
+  if (previo){ toast('Ese lote ya fue enviado: te muestro el mismo enlace','ok'); irA('aprobaciones'); return mostrarEnlace(previo.id); }
   await crearAprobacion(consId, libros);
 }
 
@@ -1909,10 +1936,19 @@ function abrirWhatsapp(tel, mensaje){
   window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(mensaje), '_blank');
 }
 
-function urlAprobacion(token){
-  const base = (S.cfg.urlPublica || '').trim() || (location.origin + location.pathname);
-  return base.replace(/#.*$/,'') + '#/aprobar/' + token;
+/* 28-oct-2026: el enlace se arma con la dirección donde realmente corre esta app.
+   Antes se tomaba de Ajustes y, si ahí había otra dirección (la del POS, una sin
+   https, una con errores), el consignante abría una página que no mostraba sus
+   libros. Ajustes solo se usa si la app se abre desde un archivo local. */
+function baseApp(){
+  const enWeb = /^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
+  let base = enWeb ? (location.origin + location.pathname) : (S.cfg.urlPublica || '').trim();
+  if (!base) base = 'https://mfge2009-ai.github.io/segunda-vida/';
+  if (!/^https?:\/\//i.test(base)) base = 'https://' + base;
+  return base.replace(/[?#].*$/,'').replace(/index\.html$/,'');
 }
+function urlAprobacion(token){ return baseApp() + '?aprobar=' + token; }
+function abrirEnTienda(token){ location.href = baseApp() + '?aprobar=' + token; }
 
 function mostrarEnlace(id){
   const ap = S.aprob.find(a=>a.id===id); if(!ap) return;
@@ -1926,13 +1962,13 @@ Ahí mismo puedes leer y aceptar el contrato de consignación.
 Recuerda: si el libro se vende recibes el ${S.cfg.pctConsignante}% del precio, y la exhibición es de ${S.cfg.plazoDias} días.`;
   modal('Enlace de aprobación', `
     <p class="sub" style="margin-bottom:12px">${esc(ap.consignanteNombre)} · ${ap.items.length} libro(s) · total ${money(total)}</p>
-    ${S.cfg.urlPublica ? '' : '<div class="note warn">Para enviar el enlace por WhatsApp, primero guarda en Ajustes la dirección web donde publicaste la app. Mientras tanto, puedes abrirlo aquí mismo en tienda.</div>'}
+    <div class="note info">Antes de enviarlo puedes probarlo: pulsa «Abrir en tienda» y debe mostrar los libros.</div>
     <label class="f"><span>Enlace</span><input type="text" class="mono" value="${esc(url)}" onclick="this.select()" readonly></label>
     <label class="f"><span>Mensaje listo para WhatsApp o Instagram</span><textarea style="min-height:130px" id="msgWa" readonly>${esc(msg)}</textarea></label>
   `, [
     {t:'Cerrar', c:'ghost', f:cerrarModal},
     {t:'Copiar mensaje', c:'ghost', f:()=>{ navigator.clipboard.writeText(msg).then(()=>toast('Mensaje copiado','ok')); }},
-    {t:'Abrir en tienda', c:'ghost', f:()=>{ cerrarModal(); location.hash = '#/aprobar/' + ap.token; location.reload(); }},
+    {t:'Abrir en tienda', c:'ghost', f:()=>{ cerrarModal(); abrirEnTienda(ap.token); }},
     {t:'Enviar por WhatsApp', f:()=>abrirWhatsapp(c.telefono, msg)}
   ]);
 }
@@ -1965,7 +2001,7 @@ function pintarAprobaciones(){
         <div><h3>${esc(ap.consignanteNombre)}</h3>
           <p class="sub">Enviado el ${fmtFechaHora(ap.creado)} · ${ap.items.length} libro(s) · ${money(total)}${ap.tipo==='regularizacion'?' · regularización':''}</p></div>
         <div class="spacer"></div>
-        <span class="tag ${pe? 't-oro':'t-verde'}">${pe? pe+' pendiente(s)':'Completa'}</span>
+        ${ap.estado==='anulada' ? '<span class="tag t-gris">Anulado</span>' : `<span class="tag ${pe? 't-oro':'t-verde'}">${pe? pe+' pendiente(s)':'Completa'}</span>`}
       </div>
       <div class="row" style="margin-bottom:10px">
         <span class="tag t-verde">${ok} aprobado(s)</span>
@@ -1979,7 +2015,8 @@ function pintarAprobaciones(){
       </tbody></table></div>
       <div class="row" style="margin-top:11px">
         <button class="btn ghost sm" onclick="mostrarEnlace('${ap.id}')">Ver enlace y mensaje</button>
-        <button class="btn ghost sm" onclick="location.hash='#/aprobar/${ap.token}';location.reload()">Abrir en tienda</button>
+        <button class="btn ghost sm" onclick="abrirEnTienda('${ap.token}')">Abrir en tienda</button>
+        ${ap.estado==='pendiente'?`<button class="btn ghost sm" onclick="anularLote('${ap.id}')" title="Para lotes repetidos o enviados por error">Anular lote</button>`:''}
         <button class="btn ghost sm" onclick="sincronizarAprobaciones(true)">Actualizar decisiones</button>
       </div>
     </div>`;
@@ -1992,6 +2029,7 @@ async function sincronizarAprobaciones(avisar){
   try{
     if (avisar) S.aprob = await DB.lista(COL.aprob);
     for (const ap of S.aprob){
+      if (ap.estado === 'anulada') continue;
       for (const it of (ap.items||[])){
         if (it.decision === 'pendiente') continue;
         const l = libroPorId(it.libroId);
@@ -2013,7 +2051,9 @@ async function sincronizarAprobaciones(avisar){
           cambios++;
           continue;
         }
-        const destino = it.decision === 'aprobado' ? 'aprobado' : 'rechazado';
+        // 28-oct-2026: lo aprobado pasa directo a exhibición y al POS
+        // (antes quedaba en «Aprobado» esperando que alguien lo publicara a mano).
+        const destino = it.decision === 'aprobado' ? (S.cfg.publicarAlAprobar === false ? 'aprobado' : 'publicado') : 'rechazado';
         if (l.estado === 'pendiente_aprobacion'){
           l.aprobacion = { decision:it.decision, fecha:it.fecha, canal:it.canal||'enlace', comentario:it.comentario||'' };
           if (it.decision === 'rechazado') l.motivoRechazo = 'Precio no aprobado por el consignante';
@@ -2044,8 +2084,50 @@ async function sincronizarAprobaciones(avisar){
       if (!pend && ap.estado !== 'completa'){ ap.estado = 'completa'; await DB.guardar(COL.aprob, ap); }
     }
   }catch(e){ if (avisar) toast('No se pudieron sincronizar: ' + e.message,'err'); }
+  cambios += await enviarAprobadosAlPOS(avisar);
   if (avisar){ pintarTodo(); toast(cambios?`${cambios} libro(s) actualizados`:'Todo al día','ok'); }
   return cambios;
+}
+
+/* Libros con precio aprobado que todavía no están en el POS:
+   - «Aprobado» con aprobación del consignante → pasa a «Publicado»;
+   - «Publicado» sin la marca sincronizadoPOS → se vuelve a enviar.
+   Corre al abrir la app y con «Actualizar decisiones». Si el POS rechaza la
+   escritura (rol sin permiso), se avisa y se reintenta en la próxima apertura. */
+async function enviarAprobadosAlPOS(avisar){
+  if (S.modo !== 'nube' || S.cfg.sincronizarPOS === false) return 0;
+  if (S.rol && !['admin','pos'].includes(S.rol)) return 0;   // madu/consigna solo admin o pos
+  const auto = S.cfg.publicarAlAprobar !== false;
+  const ids = [];
+  for (const l of S.libros){
+    if (l.aceptado === false) continue;
+    if (auto && l.estado === 'aprobado' && l.aprobacion && l.aprobacion.decision === 'aprobado'){
+      const o = Object.assign({}, l, { estado:'publicado' });
+      o.historial = (o.historial||[]).concat([{ f:new Date().toISOString(), e:'publicado', u:'sistema · precio aprobado' }]);
+      const g = await DB.guardar(COL.libros, o);
+      S.libros[S.libros.findIndex(x=>x.id===g.id)] = g;
+      ids.push(g.id);
+    } else if (l.estado === 'publicado' && !l.sincronizadoPOS && !l.posLibroId){
+      ids.push(l.id);
+    }
+  }
+  if (!ids.length) return 0;
+  const n = await publicarEnPOS(ids, true);
+  if (n < ids.length) toast(`No se pudieron enviar ${ids.length - n} libro(s) al POS. Revisa la conexión; se reintenta al volver a abrir.`, 'err');
+  else if (avisar || n) toast(`${n} libro(s) aprobados enviados al POS`, 'ok');
+  return n;
+}
+
+/* Lotes repetidos o enviados por error: quedan anulados (no se borran) y su
+   enlace deja de funcionar. Las respuestas ya registradas en los libros no cambian. */
+async function anularLote(id){
+  const ap = S.aprob.find(a => a.id === id); if (!ap) return;
+  const pe = ap.items.filter(i => i.decision === 'pendiente').length;
+  if (!confirm(`¿Anular el lote de ${ap.consignanteNombre} del ${fmtFechaHora(ap.creado)}?\n\n${pe} libro(s) sin responder. El enlace dejará de funcionar. No cambia nada en los libros.`)) return;
+  const o = Object.assign({}, ap, { estado:'anulada', anuladoEl:new Date().toISOString(), anuladoPor:(S.user?S.user.email:'local') });
+  try { const g = await DB.guardar(COL.aprob, o); S.aprob[S.aprob.findIndex(a => a.id === id)] = g; }
+  catch(e){ return toast('No se pudo anular: ' + e.message, 'err'); }
+  pintarTodo(); toast('Lote anulado', 'ok');
 }
 
 /* ============================ VISTA PÚBLICA DEL CONSIGNANTE ============================ */
@@ -2062,17 +2144,24 @@ async function arrancarVistaPublica(token){
     if (!cfg){ $('#pubBody').innerHTML = '<div class="empty"><b>No pudimos abrir tus libros</b>Escríbenos por WhatsApp o Instagram y te ayudamos.</div>'; return; }
     try{
       if (!firebase.apps.length) firebase.initializeApp(cfg);
-      S.db = firebase.firestore(); S.modo = 'nube';
+      S.db = firebase.firestore();
+      // Los navegadores internos de WhatsApp e Instagram a veces bloquean la
+      // conexión continua de Firestore y la página se queda en blanco.
+      try { S.db.settings({ experimentalAutoDetectLongPolling:true, merge:true }); } catch(e){}
+      S.modo = 'nube';
     }catch(e){ $('#pubBody').innerHTML = '<div class="empty"><b>No se pudo abrir el enlace</b>' + esc(e.message) + '</div>'; return; }
   }
   try{
-    const ap = await DB.obtener(COL.aprob, token);
-    if (!ap){ $('#pubBody').innerHTML = '<div class="empty"><b>Este enlace ya no está disponible</b>Escríbenos por Instagram y te enviamos uno nuevo.</div>'; return; }
+    const espera = new Promise((_, no) => setTimeout(() => no(new Error('La conexión está tardando demasiado.')), 20000));
+    const ap = await Promise.race([DB.obtener(COL.aprob, token), espera]);
+    if (!ap || ap.estado === 'anulada'){ $('#pubBody').innerHTML = '<div class="empty"><b>Este enlace ya no está disponible</b>Escríbenos por Instagram y te enviamos uno nuevo.</div>'; return; }
     PUB = ap;
     S.cfg = Object.assign({}, CFG_DEF, { pctConsignante:(ap.condiciones||{}).pctCons||70, pctLibreria:(ap.condiciones||{}).pctLib||30, plazoDias:(ap.condiciones||{}).plazo||120 });
     pintarPublica();
   }catch(e){
-    $('#pubBody').innerHTML = '<div class="empty"><b>No se pudo leer el enlace</b>' + esc(e.message) + '</div>';
+    $('#pubBody').innerHTML = '<div class="empty"><b>No se pudo leer el enlace</b>' + esc(e.message) +
+      '<br><br><button class="btn" onclick="location.reload()">Intentar de nuevo</button>' +
+      '<br><small>Si sigue igual, abre el enlace en Safari o Chrome (menú ⋯ → «Abrir en el navegador»).</small></div>';
   }
 }
 
