@@ -312,6 +312,7 @@ details.sec > .in{padding:2px 13px 12px}
   <button data-p="aprobaciones">Aprobaciones <span class="badge hide" id="bgApro">0</span></button>
   <button data-p="ventas">Ventas y pagos</button>
 </nav>
+<div id="avisoNube" style="max-width:1180px;margin:10px auto 0;padding:0 16px"></div>
 
 <main>
 
@@ -883,6 +884,7 @@ async function arrancarApp(){
   recalcularVencidos(false);
   if (!pintado) irA(pestana, true); else pintarTodo();
   sincronizarEnSegundoPlano();
+  revisarNube();
 }
 
 async function leerColecciones(fuente){
@@ -1962,7 +1964,7 @@ Ahí mismo puedes leer y aceptar el contrato de consignación.
 Recuerda: si el libro se vende recibes el ${S.cfg.pctConsignante}% del precio, y la exhibición es de ${S.cfg.plazoDias} días.`;
   modal('Enlace de aprobación', `
     <p class="sub" style="margin-bottom:12px">${esc(ap.consignanteNombre)} · ${ap.items.length} libro(s) · total ${money(total)}</p>
-    <div class="note info">Antes de enviarlo puedes probarlo: pulsa «Abrir en tienda» y debe mostrar los libros.</div>
+    <div id="verifEnlace" class="note info">Comprobando que el enlace esté en la nube…</div>
     <label class="f"><span>Enlace</span><input type="text" class="mono" value="${esc(url)}" onclick="this.select()" readonly></label>
     <label class="f"><span>Mensaje listo para WhatsApp o Instagram</span><textarea style="min-height:130px" id="msgWa" readonly>${esc(msg)}</textarea></label>
   `, [
@@ -1971,6 +1973,116 @@ Recuerda: si el libro se vende recibes el ${S.cfg.pctConsignante}% del precio, y
     {t:'Abrir en tienda', c:'ghost', f:()=>{ cerrarModal(); abrirEnTienda(ap.token); }},
     {t:'Enviar por WhatsApp', f:()=>abrirWhatsapp(c.telefono, msg)}
   ]);
+  verificarEnlace(ap);
+}
+
+/* ===================== VERIFICAR QUE LOS DATOS ESTÉN EN LA NUBE =====================
+   30-oct-2026: el consignante veía «Este enlace ya no está disponible» porque el
+   lote no estaba en la nube (solo en el navegador donde se creó). Ahora la app
+   lo comprueba contra el servidor y permite subir lo que falte.            */
+function enLaNube(col, id){
+  return S.db.collection(col).doc(id).get({ source:'server' }).then(d => d.exists);
+}
+async function verificarEnlace(ap){
+  const el = () => document.getElementById('verifEnlace');
+  if (S.modo !== 'nube'){
+    if (el()) el().outerHTML = `<div class="note warn" id="verifEnlace"><b>Este enlace NO funcionará fuera de este equipo.</b> La app está en «Modo local»: el lote está guardado solo en este navegador. Pulsa «Pasar a la nube» en el aviso rojo de arriba.</div>`;
+    return;
+  }
+  try{
+    const ok = await enLaNube(COL.aprob, ap.id);
+    if (!el()) return;
+    el().outerHTML = ok
+      ? `<div class="note ok" id="verifEnlace">✓ Verificado en la nube: el consignante podrá abrir este enlace desde su celular.</div>`
+      : `<div class="note warn" id="verifEnlace"><b>Este lote no está en la nube</b>, por eso el consignante ve «enlace no disponible».
+           <button class="btn sm" style="margin-left:8px" onclick="subirFaltantes()">Subir ahora</button></div>`;
+  }catch(e){
+    if (el()) el().outerHTML = `<div class="note warn" id="verifEnlace">No se pudo comprobar con el servidor (${esc(e.message)}). Revisa el internet de este equipo.</div>`;
+  }
+}
+
+let FALTAN = null;
+async function revisarNube(){
+  const caja = $('#avisoNube'); if (!caja) return;
+  if (S.modo === 'local'){
+    caja.innerHTML = `<div class="note warn" style="border-color:#c0392b">
+      <b>⚠ Estás en MODO LOCAL.</b> Todo lo que registras se guarda solo en este navegador: los enlaces de aprobación no abren en el celular del consignante y los libros no llegan al POS.
+      <div class="row" style="margin-top:8px"><button class="btn sm" onclick="pasarALaNube()">Pasar a la nube (sin perder nada)</button></div></div>`;
+    return;
+  }
+  const loc = (()=>{ try { return JSON.parse(localStorage.getItem(LS.local)) || null; } catch(e){ return null; } })();
+  const nLoc = loc ? [COL.cons, COL.libros, COL.aprob].reduce((s,c)=>s+((loc[c]||[]).length),0) : 0;
+  // Lo que la app muestra pero el servidor no tiene (escrituras que nunca subieron)
+  FALTAN = { [COL.cons]:[], [COL.libros]:[], [COL.aprob]:[] };
+  try{
+    const lista = [[COL.cons,S.cons],[COL.libros,S.libros],[COL.aprob,S.aprob]];
+    for (const [col, arr] of lista){
+      const snap = await S.db.collection(col).get({ source:'server' });
+      const ids = new Set(snap.docs.map(d => d.id));
+      FALTAN[col] = arr.filter(x => !ids.has(x.id));
+    }
+  }catch(e){ FALTAN = null; }
+  const nFal = FALTAN ? Object.values(FALTAN).reduce((s,a)=>s+a.length,0) : 0;
+  let html = '';
+  if (nLoc) html += `<div class="note warn" style="border-color:#c0392b"><b>Hay datos guardados solo en este navegador</b> (de cuando la app estuvo en «Modo local»):
+      ${(loc[COL.cons]||[]).length} consignante(s), ${(loc[COL.libros]||[]).length} libro(s), ${(loc[COL.aprob]||[]).length} lote(s) de aprobación.
+      <div class="row" style="margin-top:8px"><button class="btn sm" onclick="subirLocalANube()">Subir a la nube</button></div></div>`;
+  if (nFal) html += `<div class="note warn" style="border-color:#c0392b"><b>${nFal} registro(s) no están en la nube</b>
+      (${FALTAN[COL.aprob].length} lote(s) de aprobación, ${FALTAN[COL.libros].length} libro(s), ${FALTAN[COL.cons].length} consignante(s)). Sus enlaces no abren fuera de este equipo.
+      <div class="row" style="margin-top:8px"><button class="btn sm" onclick="subirFaltantes()">Subir ahora</button></div></div>`;
+  if (!FALTAN && !nLoc) html = `<div class="note warn">No se pudo comprobar con el servidor si todo está en la nube. Revisa el internet de este equipo.</div>`;
+  caja.innerHTML = html;
+}
+
+function pasarALaNube(){
+  respaldar();   // copia de seguridad antes de cambiar nada
+  try { localStorage.removeItem(LS.modo); } catch(e){}
+  toast('Respaldo descargado. Ahora entra con tu correo y contraseña.','ok');
+  setTimeout(()=>location.reload(), 1500);
+}
+
+/* Sube lo de «Modo local». No pisa lo que ya está en la nube salvo que la copia
+   local sea más reciente. Los correlativos SV-/C- quedan en el mayor de los dos. */
+async function subirLocalANube(){
+  let loc; try { loc = JSON.parse(localStorage.getItem(LS.local)) || {}; } catch(e){ loc = {}; }
+  if (!confirm('Se descargará un respaldo y luego se subirán a la nube los datos de este navegador. ¿Continuar?')) return;
+  bajarArchivo('respaldo-modo-local-' + hoyISO() + '.json', JSON.stringify(loc,null,2), 'application/json');
+  let n = 0, err = 0;
+  for (const col of [COL.cons, COL.libros, COL.aprob, COL.cfg]){
+    for (const o of (loc[col]||[])){
+      try{
+        const d = await S.db.collection(col).doc(o.id).get({ source:'server' });
+        if (d.exists && String(d.data().actualizado||'') >= String(o.actualizado||'')) continue;
+        const { id, ...resto } = o;
+        await S.db.collection(col).doc(id).set(resto);
+        n++;
+      }catch(e){ err++; }
+    }
+  }
+  try{
+    const c = loc.contadores || {};
+    const ref = S.db.collection(COL.meta).doc('contadores');
+    await S.db.runTransaction(async tx => {
+      const d = await tx.get(ref); const v = d.exists ? d.data() : {};
+      tx.set(ref, { cons:Math.max(v.cons||0, c.cons||0), libros:Math.max(v.libros||0, c.libros||0) }, { merge:true });
+    });
+  }catch(e){ err++; }
+  if (!err){ try { localStorage.setItem(LS.local + '_subido_' + hoyISO(), localStorage.getItem(LS.local)); localStorage.removeItem(LS.local); } catch(e){} }
+  toast(err ? `Se subieron ${n}; ${err} no se pudieron subir. Vuelve a intentarlo.` : `Listo: ${n} registro(s) subidos a la nube`, err?'err':'ok');
+  await cargarTodo(); revisarNube();
+}
+
+async function subirFaltantes(){
+  if (!FALTAN){ await revisarNube(); if (!FALTAN) return; }
+  let n = 0, err = 0;
+  for (const col of [COL.cons, COL.libros, COL.aprob]){
+    for (const o of FALTAN[col]){
+      try { const { id, ...resto } = JSON.parse(JSON.stringify(o)); await S.db.collection(col).doc(id).set(resto); n++; }
+      catch(e){ err++; }
+    }
+  }
+  toast(err ? `Se subieron ${n}; ${err} con error (${'revisa internet o permisos'}).` : `Listo: ${n} registro(s) subidos. Los enlaces ya funcionan.`, err?'err':'ok');
+  cerrarModal(); await revisarNube();
 }
 
 function pintarAprobaciones(){
@@ -2154,7 +2266,7 @@ async function arrancarVistaPublica(token){
   try{
     const espera = new Promise((_, no) => setTimeout(() => no(new Error('La conexión está tardando demasiado.')), 20000));
     const ap = await Promise.race([DB.obtener(COL.aprob, token), espera]);
-    if (!ap || ap.estado === 'anulada'){ $('#pubBody').innerHTML = '<div class="empty"><b>Este enlace ya no está disponible</b>Escríbenos por Instagram y te enviamos uno nuevo.</div>'; return; }
+    if (!ap || ap.estado === 'anulada'){ $('#pubBody').innerHTML = '<div class="empty"><b>Este enlace ya no está disponible</b>Escríbenos por Instagram y te enviamos uno nuevo.<br><small style="color:var(--ink-3)">Ref. ' + esc(token) + (ap ? ' · anulado' : ' · no encontrado') + '</small></div>'; return; }
     PUB = ap;
     S.cfg = Object.assign({}, CFG_DEF, { pctConsignante:(ap.condiciones||{}).pctCons||70, pctLibreria:(ap.condiciones||{}).pctLib||30, plazoDias:(ap.condiciones||{}).plazo||120 });
     pintarPublica();
