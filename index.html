@@ -2908,8 +2908,11 @@ async function revisarEsperaStock(){
    No duplica nada: empareja por el identificador interno que ya quedó guardado. */
 async function migrarCodigosBarras(){
   if (S.modo !== 'nube') return toast('Disponible solo con la app conectada a la nube','err');
-  const libros = S.libros.filter(l => ['aprobado','publicado','vencido'].includes(l.estado) && !l.enEspera && codigoBarras(l.codigo));
-  if (!libros.length) return toast('No hay libros en exhibición que actualizar','ok');
+  // Solo los que YA están en el módulo del POS: esta función reescribe códigos,
+  // nunca pone a la venta un libro que todavía no habías publicado.
+  const libros = S.libros.filter(l => l.posLibroId && !l.enEspera && codigoBarras(l.codigo)
+                                   && !['retirado','rechazado'].includes(l.estado));
+  if (!libros.length) return toast('No hay libros en el POS que actualizar','ok');
   if (!confirm(`Se actualizará el código de ${libros.length} libro(s) en el módulo de consignación del POS, del formato SV-0000 al código de barras escaneable.\n\nNo se crea ni se borra ningún libro, y las ventas ya registradas no se tocan.\n\n¿Continuar?`)) return;
   const n = await publicarEnPOS(libros.map(l=>l.id), true);
   pintarTodo();
