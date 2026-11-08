@@ -254,6 +254,33 @@ details.sec > .in{padding:2px 13px 12px}
   body{background:#fff}
   .card{box-shadow:none;border:0}
 }
+
+/* ---- hoja de etiquetas con código de barras (A4, 3 x 8 = 24 por hoja) ---- */
+#hojaEtiquetas{position:fixed;inset:0;z-index:300;background:#52525b;overflow:auto;padding:24px 0 60px}
+#hojaEtiquetas .barra{position:sticky;top:0;z-index:2;display:flex;gap:10px;align-items:center;justify-content:center;
+  flex-wrap:wrap;background:var(--surface);padding:12px;margin:-24px 0 20px;box-shadow:0 2px 10px rgba(0,0,0,.25)}
+.hoja{width:210mm;min-height:297mm;background:#fff;margin:0 auto 20px;padding:13.1mm 0 0 7.21mm;
+  box-sizing:border-box;display:flex;flex-wrap:wrap;align-content:flex-start}
+.etq{width:63.5mm;height:33.9mm;margin-right:2.54mm;box-sizing:border-box;padding:2.2mm 3mm;overflow:hidden;
+  display:flex;flex-direction:column;justify-content:space-between;break-inside:avoid;color:#000}
+.etq:nth-child(3n){margin-right:0}
+.hoja.guias .etq{outline:1px dotted #c8c8c8;outline-offset:-1px}
+.etq-tit{font:650 9pt/1.15 Georgia,serif;max-height:2.4em;overflow:hidden}
+.etq-aut{font:400 7pt/1.2 Helvetica,Arial,sans-serif;color:#555;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etq-bc{margin:1mm 0 0;height:13mm;display:flex;align-items:center;justify-content:center}
+.etq-bc svg{height:13mm;width:auto;max-width:100%}
+.etq-pie{display:flex;justify-content:space-between;align-items:baseline;gap:2mm;
+  font:650 7.5pt/1 Helvetica,Arial,sans-serif;border-top:.5pt solid #999;padding-top:1mm}
+.etq-pie b{font-size:11pt}
+.etq-marca{font:650 5.5pt/1 Helvetica,Arial,sans-serif;letter-spacing:.09em;color:#777;white-space:nowrap}
+@media print{
+  body.imp-etq > *:not(#hojaEtiquetas){display:none !important}
+  #hojaEtiquetas{position:static;overflow:visible;background:#fff;padding:0}
+  #hojaEtiquetas .barra{display:none !important}
+  .hoja{margin:0;box-shadow:none;break-after:page}
+  .hoja:last-child{break-after:auto}
+  @page{size:A4;margin:0}
+}
 </style>
 </head>
 <body>
@@ -312,7 +339,6 @@ details.sec > .in{padding:2px 13px 12px}
   <button data-p="aprobaciones">Aprobaciones <span class="badge hide" id="bgApro">0</span></button>
   <button data-p="ventas">Ventas y pagos</button>
 </nav>
-<div id="avisoNube" style="max-width:1180px;margin:10px auto 0;padding:0 16px"></div>
 
 <main>
 
@@ -393,7 +419,8 @@ details.sec > .in{padding:2px 13px 12px}
 <section class="page" id="p-inventario">
   <div class="hd"><div><h2>Inventario</h2><p class="sub">Todos los libros del programa y su estado</p></div><div class="spacer"></div>
     <button class="btn ghost" onclick="irA('exportar')">Exportar CSV</button>
-    <button class="btn ghost" onclick="irA('documentos')">Contratos y anexos</button></div>
+    <button class="btn ghost" onclick="irA('documentos')">Contratos y anexos</button>
+    <button class="btn ghost" onclick="abrirEtiquetas(seleccionados())">Etiquetas con código de barras</button></div>
   <div class="filters">
     <input type="text" id="fInv" placeholder="Buscar por título, autor, ISBN, código o consignante…" oninput="INV_LIM=200;deb(pintarInventario)">
     <select id="fInvEstado" onchange="pintarInventario()"></select>
@@ -545,6 +572,7 @@ details.sec > .in{padding:2px 13px 12px}
       <button class="btn ghost" onclick="importarVentasPOS(true)">Traer ventas del POS ahora</button>
       <button class="btn ghost" onclick="importarDesdePOS()">Importar la consignación que ya está en el POS</button>
       <button class="btn ghost" onclick="verEstadoPOS()">Ver qué hay en el POS</button>
+      <button class="btn ghost" onclick="migrarCodigosBarras()">Actualizar códigos de barras en el POS</button>
     </div>
     <p class="sub" style="margin-top:10px">Para escribir en el POS hace falta rol <b>admin</b> o <b>pos</b>. Un usuario con rol <b>consig</b> puede usar toda la app, pero no sincronizar.</p>
   </div>
@@ -558,6 +586,7 @@ details.sec > .in{padding:2px 13px 12px}
 </main>
 </div>
 
+<div id="hojaEtiquetas" class="hide"></div>
 <div id="modales"></div>
 <div id="toast"></div>
 
@@ -579,16 +608,7 @@ details.sec > .in{padding:2px 13px 12px}
 
 /* ---- 1. Si prefieres dejar la configuración fija en el archivo, pégala aquí
         y la app dejará de pedirla en cada dispositivo. ---- */
-/* 28-oct-2026: fija, para que el enlace del consignante no dependa de leer
-   el archivo del POS (888 KB) desde el celular. No es un secreto. */
-const FIREBASE_CONFIG_FIJA = {
-  apiKey: "AIzaSyBzAwD0HBDhWe7u_1o1toLPJLhiduHVJyo",
-  authDomain: "la-madriguera-cb489.firebaseapp.com",
-  projectId: "la-madriguera-cb489",
-  storageBucket: "la-madriguera-cb489.firebasestorage.app",
-  messagingSenderId: "648077569073",
-  appId: "1:648077569073:web:7b438dfdac9d5fef063910"
-};
+const FIREBASE_CONFIG_FIJA = null; /* ej: { apiKey:"…", authDomain:"…", projectId:"la-madriguera-cb489", appId:"…" } */
 
 const PREFIJO = 'lm_consig_';
 const COL = {
@@ -740,8 +760,9 @@ window.addEventListener('DOMContentLoaded', iniciar);
 
 async function iniciar(){
   // ¿link público de aprobación?  #/aprobar/TOKEN
-  const tokenPub = tokenDeEnlace();
-  if (tokenPub){ return arrancarVistaPublica(tokenPub); }
+  const h = location.hash || '';
+  const mAp = h.match(/#\/aprobar\/([A-Za-z0-9_-]+)/);
+  if (mAp){ return arrancarVistaPublica(mAp[1]); }
 
   $('#gate').classList.remove('hide');
   const modo = localStorage.getItem(LS.modo);
@@ -752,20 +773,6 @@ async function iniciar(){
   if (!cfg){ $('#gateWait').classList.add('hide'); $('#gateSetup').classList.remove('hide'); return; }
   conectarFirebase(cfg);
 }
-
-/* El token llega como ?aprobar=TOKEN (enlaces nuevos: sobrevive a WhatsApp,
-   Instagram y acortadores, que a veces cortan lo que va después de #) o como
-   #/aprobar/TOKEN (enlaces ya enviados). */
-function tokenDeEnlace(){
-  try {
-    const q = new URLSearchParams(location.search).get('aprobar');
-    if (q && /^[A-Za-z0-9_-]+$/.test(q)) return q;
-  } catch(e){}
-  const m = (location.hash || '').match(/#\/?aprobar[\/=]([A-Za-z0-9_-]+)/);
-  return m ? m[1] : null;
-}
-// Si en la misma pestaña cambia el enlace (#/aprobar/…), se recarga para abrirlo
-window.addEventListener('hashchange', () => { if (/aprobar/.test(location.hash)) location.reload(); });
 
 function leerCfgGuardada(){ try { return JSON.parse(localStorage.getItem(LS.cfg)); } catch(e){ return null; } }
 
@@ -884,7 +891,6 @@ async function arrancarApp(){
   recalcularVencidos(false);
   if (!pintado) irA(pestana, true); else pintarTodo();
   sincronizarEnSegundoPlano();
-  revisarNube();
 }
 
 async function leerColecciones(fuente){
@@ -928,6 +934,7 @@ async function sincronizarEnSegundoPlano(){
       // Una sola lectura del documento del POS sirve para ventas y para altas
       const v = await leerConsignaPOS().catch(()=>null);
       if (v){ await importarVentasPOS(false, v); await revisarAltasPOS(v); }
+      await revisarEsperaStock();
     }
     pintarTodo();
     estadoSync('Al día · ' + new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}), 'ok');
@@ -1199,6 +1206,13 @@ async function buscarISBN(){
    3. Google Books
    4. Open Library                                                            */
 async function consultarISBN(isbn){
+  const [r, pos] = await Promise.all([ consultarFuentesISBN(isbn), buscarEnPOS(isbn) ]);
+  if (pos && pos.posStock > 0)
+    r.datos = Object.assign({ isbn }, r.datos || {}, { posStock: pos.posStock, posPrecio: pos.posPrecio });
+  return r;
+}
+
+async function consultarFuentesISBN(isbn){
   const [interno, pos, ext] = await Promise.all([
     buscarEnPrograma(isbn), buscarEnPOS(isbn), buscarEnCatalogosWeb(isbn)
   ]);
@@ -1253,6 +1267,8 @@ async function buscarEnPOS(isbn){
       autor: p.author || '',
       categoria: mapearCategoria([p.subcategory, p.category].join(' ')),
       precioNuevoEst: Number(p.price) || 0,
+      posStock: Number(p.stock) || 0,
+      posPrecio: Number(p.price) || 0,
       fuente: 'el catálogo del POS'
     };
   }catch(e){ return null; }
@@ -1443,6 +1459,11 @@ function abrirLibro(id, esNuevo, pre){
   modal(id ? 'Libro ' + l.codigo : 'Nuevo libro', `
     ${l.estado==='vendido' && l.venta && l.venta.origen==='POS' ? `<div class="note info">Venta registrada en el POS el ${fmtFecha(l.venta.fecha)} por ${money(l.venta.precioVenta)}. Si esa venta se anuló o se borró en el POS, usa <b>Quitar del POS</b> y luego <b>Eliminar</b> para dejar el registro limpio.</div>` : ''}
     ${l.duplicado ? `<div class="note warn">${esc(l.duplicado)}</div>` : ''}
+    ${l.posStock ? `<div class="note bad">
+      <b>Ya tienes ${l.posStock} ejemplar(es) nuevo(s) de este título</b> en el POS a ${money(l.posPrecio)}.
+      Si lo exhibes al lado del nuevo, el cliente se lleva el usado y te queda solo tu ${S.cfg.pctLibreria}% en vez del margen completo del nuevo.
+      Precio usado recomendado: <b>máximo ${money(Math.round(l.posPrecio*0.6*2)/2)}</b> (60% del nuevo).
+      Si el nuevo rota, conviene recibirlo y dejarlo en espera.</div>` : ''}
     ${l.fuente ? `<div class="note ok" style="padding:8px 12px">Datos tomados de ${esc(l.fuente)}.</div>` : (nuevo && l.isbn ? '<div class="note info" style="padding:8px 12px">El ISBN no apareció en el POS ni en los catálogos: completa título y precio de referencia.</div>' : '')}
     <p class="sub" style="margin:-4px 0 10px">Consignante: <b>${esc(nombreCons(c))}</b></p>
 
@@ -1470,6 +1491,8 @@ function abrirLibro(id, esNuevo, pre){
     <details class="sec" ${faltanDatos && !nuevo ? 'open' : ''}><summary>Más datos del libro <em>ISBN, editorial, año, categoría, portada</em></summary><div class="in">
       <div class="grid g2">
         <label class="f"><span>ISBN</span><input type="text" id="lIsbn" class="mono" value="${esc(l.isbn||'')}"></label>
+        ${id && codigoBarras(l.codigo) ? `<label class="f"><span>Código de barras de La Madriguera <em>— el que se escanea en caja</em></span>
+          <input type="text" class="mono" value="${codigoBarras(l.codigo)}" readonly onclick="this.select()"></label>` : ''}
         <label class="f"><span>Editorial</span><input type="text" id="lEd" value="${esc(l.editorial||'')}"></label>
         <label class="f"><span>Año</span><input type="number" id="lAnio" value="${esc(l.anio||'')}" onchange="autoAntiguedad()"></label>
         <label class="f"><span>Categoría</span><select id="lCat" onchange="autoDemanda()">
@@ -1506,6 +1529,9 @@ function abrirLibro(id, esNuevo, pre){
 
     <label class="check"><input type="checkbox" id="lAcep" ${l.aceptado!==false?'checked':''} onchange="toggleRechazo()">
       <span>El libro <b>se acepta</b> en el programa. Desmárcalo si se devuelve al consignante.</span></label>
+    <label class="check ${(l.posStock || l.enEspera) ? '' : 'hide'}" id="wrapEspera"><input type="checkbox" id="lEspera" ${l.enEspera?'checked':''}>
+      <span><b>Dejar en espera</b>, con contrato y precio aprobado, pero sin enviarlo al POS hasta que se acabe tu stock nuevo.
+      <br><span class="sub">El plazo de ${S.cfg.plazoDias} días corre igual desde hoy: conviene avisarle a la consignante que el libro entra en espera.</span></span></label>
     <label class="f ${l.aceptado===false?'':'hide'}" id="wrapRech"><span>Motivo del rechazo</span>
       <select id="lMot">${['Humedad, hongos u olor','Páginas faltantes o sueltas','Subrayados o anotaciones extensas','Daño estructural (lomo, tapas)','Edición fotocopiada o pirata','Contenido no acorde a la curaduría','Género sin demanda','Sin espacio de exhibición']
         .map(m=>`<option ${l.motivoRechazo===m?'selected':''}>${m}</option>`).join('')}</select></label>
@@ -1630,6 +1656,11 @@ async function guardarLibro(id, consId, orig){
   l.fotos = FOTOS_TMP.slice();
   l.aceptado = $('#lAcep').checked;
   l.motivoRechazo = l.aceptado ? '' : $('#lMot').value;
+  const chkEsp = $('#lEspera');
+  l.enEspera = !!(chkEsp && chkEsp.checked && l.aceptado);
+  if (l.enEspera){ if (!l.esperaDesde) l.esperaDesde = hoyISO(); }
+  else { delete l.esperaDesde; }
+  if (l.posStock != null){ l.stockNuevoAlIngreso = l.posStock; delete l.posStock; delete l.posPrecio; }
   l.precioNuevoEst = parseFloat($('#lBase').value)||0;
   l.precioMinimoCons = parseFloat($('#lMin').value)||0;
   l.precioSugerido = calcularPrecio(l).precio;
@@ -1787,13 +1818,14 @@ function pintarInventario(){
     return `<tr>
       <td><input type="checkbox" class="chkInv" value="${l.id}"></td>
       <td class="mono">${esc(l.codigo)}</td>
-      <td><b>${esc(l.titulo)}</b><br><small style="color:var(--ink-3)">${esc(l.autor||'—')}${l.isbn?' · '+esc(l.isbn):''}</small></td>
+      <td><b>${esc(l.titulo)}</b>${l.enEspera ? ` <span class="tag ${l.stockNuevoActual===0?'t-verde':'t-gris'}">En espera${l.stockNuevoActual===0?' · ya se puede publicar':(l.stockNuevoActual?' · '+l.stockNuevoActual+' nuevos en POS':'')}</span>` : ''}<br><small style="color:var(--ink-3)">${esc(l.autor||'—')}${l.isbn?' · '+esc(l.isbn):''}</small></td>
       <td>${esc(l.consignanteNombre||'—')}</td>
       <td>${ESTADOS_FISICOS[l.estadoFisico]||'—'}</td>
       <td><b>${money(l.precioFinal||l.precioSugerido)}</b></td>
       <td><span class="tag ${SITUACIONES[l.estado].c}">${SITUACIONES[l.estado].t}</span></td>
       <td>${venceTxt}</td>
       <td style="text-align:right;white-space:nowrap">
+        ${l.enEspera && l.stockNuevoActual===0 ? `<button class="btn sm" onclick="liberarEspera('${l.id}')">Publicar</button>` : ''}
         <button class="btn ghost sm" onclick="abrirLibro('${l.id}')">Ficha</button>
         <button class="btn ghost sm" onclick="menuEstado('${l.id}')">Estado</button>
       </td></tr>`;
@@ -1848,7 +1880,7 @@ async function cambiarEstado(id, nuevo, silencioso){
   S.libros[S.libros.findIndex(x=>x.id===id)] = saved;
   if (nuevo === 'publicado' && S.cfg.sincronizarPOS !== false) await publicarEnPOS([id], true);
   if (['retirado','rechazado'].includes(nuevo) && S.cfg.sincronizarPOS !== false)
-    await quitarDelPOS([l.codigo, l.posLibroId].filter(Boolean), true);
+    await quitarDelPOS([l.codigo, codigoBarras(l.codigo), l.posLibroId].filter(Boolean), true);
   if (!silencioso){ cerrarModal(); pintarTodo(); toast('Situación actualizada','ok'); }
 }
 
@@ -1875,11 +1907,6 @@ async function enviarAAprobacionDe(consId){
   const libros = S.libros.filter(l => l.consignanteId === consId && l.aceptado &&
     ['aceptado','pendiente_aprobacion'].includes(l.estado));
   if (!libros.length) return toast('No hay libros aceptados pendientes de enviar','err');
-  // Si ya hay un lote pendiente con exactamente esos libros, se reutiliza su enlace
-  const ids = libros.map(l => l.id).sort().join('|');
-  const previo = S.aprob.find(a => a.consignanteId === consId && a.estado === 'pendiente' &&
-    (a.items||[]).map(i => i.libroId).sort().join('|') === ids);
-  if (previo){ toast('Ese lote ya fue enviado: te muestro el mismo enlace','ok'); irA('aprobaciones'); return mostrarEnlace(previo.id); }
   await crearAprobacion(consId, libros);
 }
 
@@ -1938,19 +1965,10 @@ function abrirWhatsapp(tel, mensaje){
   window.open('https://wa.me/' + num + '?text=' + encodeURIComponent(mensaje), '_blank');
 }
 
-/* 28-oct-2026: el enlace se arma con la dirección donde realmente corre esta app.
-   Antes se tomaba de Ajustes y, si ahí había otra dirección (la del POS, una sin
-   https, una con errores), el consignante abría una página que no mostraba sus
-   libros. Ajustes solo se usa si la app se abre desde un archivo local. */
-function baseApp(){
-  const enWeb = /^https?:$/.test(location.protocol) && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname);
-  let base = enWeb ? (location.origin + location.pathname) : (S.cfg.urlPublica || '').trim();
-  if (!base) base = 'https://mfge2009-ai.github.io/segunda-vida/';
-  if (!/^https?:\/\//i.test(base)) base = 'https://' + base;
-  return base.replace(/[?#].*$/,'').replace(/index\.html$/,'');
+function urlAprobacion(token){
+  const base = (S.cfg.urlPublica || '').trim() || (location.origin + location.pathname);
+  return base.replace(/#.*$/,'') + '#/aprobar/' + token;
 }
-function urlAprobacion(token){ return baseApp() + '?aprobar=' + token; }
-function abrirEnTienda(token){ location.href = baseApp() + '?aprobar=' + token; }
 
 function mostrarEnlace(id){
   const ap = S.aprob.find(a=>a.id===id); if(!ap) return;
@@ -1964,125 +1982,15 @@ Ahí mismo puedes leer y aceptar el contrato de consignación.
 Recuerda: si el libro se vende recibes el ${S.cfg.pctConsignante}% del precio, y la exhibición es de ${S.cfg.plazoDias} días.`;
   modal('Enlace de aprobación', `
     <p class="sub" style="margin-bottom:12px">${esc(ap.consignanteNombre)} · ${ap.items.length} libro(s) · total ${money(total)}</p>
-    <div id="verifEnlace" class="note info">Comprobando que el enlace esté en la nube…</div>
+    ${S.cfg.urlPublica ? '' : '<div class="note warn">Para enviar el enlace por WhatsApp, primero guarda en Ajustes la dirección web donde publicaste la app. Mientras tanto, puedes abrirlo aquí mismo en tienda.</div>'}
     <label class="f"><span>Enlace</span><input type="text" class="mono" value="${esc(url)}" onclick="this.select()" readonly></label>
     <label class="f"><span>Mensaje listo para WhatsApp o Instagram</span><textarea style="min-height:130px" id="msgWa" readonly>${esc(msg)}</textarea></label>
   `, [
     {t:'Cerrar', c:'ghost', f:cerrarModal},
     {t:'Copiar mensaje', c:'ghost', f:()=>{ navigator.clipboard.writeText(msg).then(()=>toast('Mensaje copiado','ok')); }},
-    {t:'Abrir en tienda', c:'ghost', f:()=>{ cerrarModal(); abrirEnTienda(ap.token); }},
+    {t:'Abrir en tienda', c:'ghost', f:()=>{ cerrarModal(); location.hash = '#/aprobar/' + ap.token; location.reload(); }},
     {t:'Enviar por WhatsApp', f:()=>abrirWhatsapp(c.telefono, msg)}
   ]);
-  verificarEnlace(ap);
-}
-
-/* ===================== VERIFICAR QUE LOS DATOS ESTÉN EN LA NUBE =====================
-   30-oct-2026: el consignante veía «Este enlace ya no está disponible» porque el
-   lote no estaba en la nube (solo en el navegador donde se creó). Ahora la app
-   lo comprueba contra el servidor y permite subir lo que falte.            */
-function enLaNube(col, id){
-  return S.db.collection(col).doc(id).get({ source:'server' }).then(d => d.exists);
-}
-async function verificarEnlace(ap){
-  const el = () => document.getElementById('verifEnlace');
-  if (S.modo !== 'nube'){
-    if (el()) el().outerHTML = `<div class="note warn" id="verifEnlace"><b>Este enlace NO funcionará fuera de este equipo.</b> La app está en «Modo local»: el lote está guardado solo en este navegador. Pulsa «Pasar a la nube» en el aviso rojo de arriba.</div>`;
-    return;
-  }
-  try{
-    const ok = await enLaNube(COL.aprob, ap.id);
-    if (!el()) return;
-    el().outerHTML = ok
-      ? `<div class="note ok" id="verifEnlace">✓ Verificado en la nube: el consignante podrá abrir este enlace desde su celular.</div>`
-      : `<div class="note warn" id="verifEnlace"><b>Este lote no está en la nube</b>, por eso el consignante ve «enlace no disponible».
-           <button class="btn sm" style="margin-left:8px" onclick="subirFaltantes()">Subir ahora</button></div>`;
-  }catch(e){
-    if (el()) el().outerHTML = `<div class="note warn" id="verifEnlace">No se pudo comprobar con el servidor (${esc(e.message)}). Revisa el internet de este equipo.</div>`;
-  }
-}
-
-let FALTAN = null;
-async function revisarNube(){
-  const caja = $('#avisoNube'); if (!caja) return;
-  if (S.modo === 'local'){
-    caja.innerHTML = `<div class="note warn" style="border-color:#c0392b">
-      <b>⚠ Estás en MODO LOCAL.</b> Todo lo que registras se guarda solo en este navegador: los enlaces de aprobación no abren en el celular del consignante y los libros no llegan al POS.
-      <div class="row" style="margin-top:8px"><button class="btn sm" onclick="pasarALaNube()">Pasar a la nube (sin perder nada)</button></div></div>`;
-    return;
-  }
-  const loc = (()=>{ try { return JSON.parse(localStorage.getItem(LS.local)) || null; } catch(e){ return null; } })();
-  const nLoc = loc ? [COL.cons, COL.libros, COL.aprob].reduce((s,c)=>s+((loc[c]||[]).length),0) : 0;
-  // Lo que la app muestra pero el servidor no tiene (escrituras que nunca subieron)
-  FALTAN = { [COL.cons]:[], [COL.libros]:[], [COL.aprob]:[] };
-  try{
-    const lista = [[COL.cons,S.cons],[COL.libros,S.libros],[COL.aprob,S.aprob]];
-    for (const [col, arr] of lista){
-      const snap = await S.db.collection(col).get({ source:'server' });
-      const ids = new Set(snap.docs.map(d => d.id));
-      FALTAN[col] = arr.filter(x => !ids.has(x.id));
-    }
-  }catch(e){ FALTAN = null; }
-  const nFal = FALTAN ? Object.values(FALTAN).reduce((s,a)=>s+a.length,0) : 0;
-  let html = '';
-  if (nLoc) html += `<div class="note warn" style="border-color:#c0392b"><b>Hay datos guardados solo en este navegador</b> (de cuando la app estuvo en «Modo local»):
-      ${(loc[COL.cons]||[]).length} consignante(s), ${(loc[COL.libros]||[]).length} libro(s), ${(loc[COL.aprob]||[]).length} lote(s) de aprobación.
-      <div class="row" style="margin-top:8px"><button class="btn sm" onclick="subirLocalANube()">Subir a la nube</button></div></div>`;
-  if (nFal) html += `<div class="note warn" style="border-color:#c0392b"><b>${nFal} registro(s) no están en la nube</b>
-      (${FALTAN[COL.aprob].length} lote(s) de aprobación, ${FALTAN[COL.libros].length} libro(s), ${FALTAN[COL.cons].length} consignante(s)). Sus enlaces no abren fuera de este equipo.
-      <div class="row" style="margin-top:8px"><button class="btn sm" onclick="subirFaltantes()">Subir ahora</button></div></div>`;
-  if (!FALTAN && !nLoc) html = `<div class="note warn">No se pudo comprobar con el servidor si todo está en la nube. Revisa el internet de este equipo.</div>`;
-  caja.innerHTML = html;
-}
-
-function pasarALaNube(){
-  respaldar();   // copia de seguridad antes de cambiar nada
-  try { localStorage.removeItem(LS.modo); } catch(e){}
-  toast('Respaldo descargado. Ahora entra con tu correo y contraseña.','ok');
-  setTimeout(()=>location.reload(), 1500);
-}
-
-/* Sube lo de «Modo local». No pisa lo que ya está en la nube salvo que la copia
-   local sea más reciente. Los correlativos SV-/C- quedan en el mayor de los dos. */
-async function subirLocalANube(){
-  let loc; try { loc = JSON.parse(localStorage.getItem(LS.local)) || {}; } catch(e){ loc = {}; }
-  if (!confirm('Se descargará un respaldo y luego se subirán a la nube los datos de este navegador. ¿Continuar?')) return;
-  bajarArchivo('respaldo-modo-local-' + hoyISO() + '.json', JSON.stringify(loc,null,2), 'application/json');
-  let n = 0, err = 0;
-  for (const col of [COL.cons, COL.libros, COL.aprob, COL.cfg]){
-    for (const o of (loc[col]||[])){
-      try{
-        const d = await S.db.collection(col).doc(o.id).get({ source:'server' });
-        if (d.exists && String(d.data().actualizado||'') >= String(o.actualizado||'')) continue;
-        const { id, ...resto } = o;
-        await S.db.collection(col).doc(id).set(resto);
-        n++;
-      }catch(e){ err++; }
-    }
-  }
-  try{
-    const c = loc.contadores || {};
-    const ref = S.db.collection(COL.meta).doc('contadores');
-    await S.db.runTransaction(async tx => {
-      const d = await tx.get(ref); const v = d.exists ? d.data() : {};
-      tx.set(ref, { cons:Math.max(v.cons||0, c.cons||0), libros:Math.max(v.libros||0, c.libros||0) }, { merge:true });
-    });
-  }catch(e){ err++; }
-  if (!err){ try { localStorage.setItem(LS.local + '_subido_' + hoyISO(), localStorage.getItem(LS.local)); localStorage.removeItem(LS.local); } catch(e){} }
-  toast(err ? `Se subieron ${n}; ${err} no se pudieron subir. Vuelve a intentarlo.` : `Listo: ${n} registro(s) subidos a la nube`, err?'err':'ok');
-  await cargarTodo(); revisarNube();
-}
-
-async function subirFaltantes(){
-  if (!FALTAN){ await revisarNube(); if (!FALTAN) return; }
-  let n = 0, err = 0;
-  for (const col of [COL.cons, COL.libros, COL.aprob]){
-    for (const o of FALTAN[col]){
-      try { const { id, ...resto } = JSON.parse(JSON.stringify(o)); await S.db.collection(col).doc(id).set(resto); n++; }
-      catch(e){ err++; }
-    }
-  }
-  toast(err ? `Se subieron ${n}; ${err} con error (${'revisa internet o permisos'}).` : `Listo: ${n} registro(s) subidos. Los enlaces ya funcionan.`, err?'err':'ok');
-  cerrarModal(); await revisarNube();
 }
 
 function pintarAprobaciones(){
@@ -2113,7 +2021,7 @@ function pintarAprobaciones(){
         <div><h3>${esc(ap.consignanteNombre)}</h3>
           <p class="sub">Enviado el ${fmtFechaHora(ap.creado)} · ${ap.items.length} libro(s) · ${money(total)}${ap.tipo==='regularizacion'?' · regularización':''}</p></div>
         <div class="spacer"></div>
-        ${ap.estado==='anulada' ? '<span class="tag t-gris">Anulado</span>' : `<span class="tag ${pe? 't-oro':'t-verde'}">${pe? pe+' pendiente(s)':'Completa'}</span>`}
+        <span class="tag ${pe? 't-oro':'t-verde'}">${pe? pe+' pendiente(s)':'Completa'}</span>
       </div>
       <div class="row" style="margin-bottom:10px">
         <span class="tag t-verde">${ok} aprobado(s)</span>
@@ -2127,8 +2035,7 @@ function pintarAprobaciones(){
       </tbody></table></div>
       <div class="row" style="margin-top:11px">
         <button class="btn ghost sm" onclick="mostrarEnlace('${ap.id}')">Ver enlace y mensaje</button>
-        <button class="btn ghost sm" onclick="abrirEnTienda('${ap.token}')">Abrir en tienda</button>
-        ${ap.estado==='pendiente'?`<button class="btn ghost sm" onclick="anularLote('${ap.id}')" title="Para lotes repetidos o enviados por error">Anular lote</button>`:''}
+        <button class="btn ghost sm" onclick="location.hash='#/aprobar/${ap.token}';location.reload()">Abrir en tienda</button>
         <button class="btn ghost sm" onclick="sincronizarAprobaciones(true)">Actualizar decisiones</button>
       </div>
     </div>`;
@@ -2141,7 +2048,6 @@ async function sincronizarAprobaciones(avisar){
   try{
     if (avisar) S.aprob = await DB.lista(COL.aprob);
     for (const ap of S.aprob){
-      if (ap.estado === 'anulada') continue;
       for (const it of (ap.items||[])){
         if (it.decision === 'pendiente') continue;
         const l = libroPorId(it.libroId);
@@ -2154,7 +2060,7 @@ async function sincronizarAprobaciones(avisar){
             l.motivoRechazo = 'Precio no aprobado por el consignante';
             if (l.estado !== 'vendido' && l.estado !== 'pagado'){
               l.estado = 'aceptado';
-              if (S.cfg.sincronizarPOS !== false) await quitarDelPOS([l.codigo, l.posLibroId].filter(Boolean), true);
+              if (S.cfg.sincronizarPOS !== false) await quitarDelPOS([l.codigo, codigoBarras(l.codigo), l.posLibroId].filter(Boolean), true);
             }
           }
           l.historial = (l.historial||[]).concat([{ f:it.fecha||new Date().toISOString(),
@@ -2163,9 +2069,7 @@ async function sincronizarAprobaciones(avisar){
           cambios++;
           continue;
         }
-        // 28-oct-2026: lo aprobado pasa directo a exhibición y al POS
-        // (antes quedaba en «Aprobado» esperando que alguien lo publicara a mano).
-        const destino = it.decision === 'aprobado' ? (S.cfg.publicarAlAprobar === false ? 'aprobado' : 'publicado') : 'rechazado';
+        const destino = it.decision === 'aprobado' ? 'aprobado' : 'rechazado';
         if (l.estado === 'pendiente_aprobacion'){
           l.aprobacion = { decision:it.decision, fecha:it.fecha, canal:it.canal||'enlace', comentario:it.comentario||'' };
           if (it.decision === 'rechazado') l.motivoRechazo = 'Precio no aprobado por el consignante';
@@ -2196,50 +2100,8 @@ async function sincronizarAprobaciones(avisar){
       if (!pend && ap.estado !== 'completa'){ ap.estado = 'completa'; await DB.guardar(COL.aprob, ap); }
     }
   }catch(e){ if (avisar) toast('No se pudieron sincronizar: ' + e.message,'err'); }
-  cambios += await enviarAprobadosAlPOS(avisar);
   if (avisar){ pintarTodo(); toast(cambios?`${cambios} libro(s) actualizados`:'Todo al día','ok'); }
   return cambios;
-}
-
-/* Libros con precio aprobado que todavía no están en el POS:
-   - «Aprobado» con aprobación del consignante → pasa a «Publicado»;
-   - «Publicado» sin la marca sincronizadoPOS → se vuelve a enviar.
-   Corre al abrir la app y con «Actualizar decisiones». Si el POS rechaza la
-   escritura (rol sin permiso), se avisa y se reintenta en la próxima apertura. */
-async function enviarAprobadosAlPOS(avisar){
-  if (S.modo !== 'nube' || S.cfg.sincronizarPOS === false) return 0;
-  if (S.rol && !['admin','pos'].includes(S.rol)) return 0;   // madu/consigna solo admin o pos
-  const auto = S.cfg.publicarAlAprobar !== false;
-  const ids = [];
-  for (const l of S.libros){
-    if (l.aceptado === false) continue;
-    if (auto && l.estado === 'aprobado' && l.aprobacion && l.aprobacion.decision === 'aprobado'){
-      const o = Object.assign({}, l, { estado:'publicado' });
-      o.historial = (o.historial||[]).concat([{ f:new Date().toISOString(), e:'publicado', u:'sistema · precio aprobado' }]);
-      const g = await DB.guardar(COL.libros, o);
-      S.libros[S.libros.findIndex(x=>x.id===g.id)] = g;
-      ids.push(g.id);
-    } else if (l.estado === 'publicado' && !l.sincronizadoPOS && !l.posLibroId){
-      ids.push(l.id);
-    }
-  }
-  if (!ids.length) return 0;
-  const n = await publicarEnPOS(ids, true);
-  if (n < ids.length) toast(`No se pudieron enviar ${ids.length - n} libro(s) al POS. Revisa la conexión; se reintenta al volver a abrir.`, 'err');
-  else if (avisar || n) toast(`${n} libro(s) aprobados enviados al POS`, 'ok');
-  return n;
-}
-
-/* Lotes repetidos o enviados por error: quedan anulados (no se borran) y su
-   enlace deja de funcionar. Las respuestas ya registradas en los libros no cambian. */
-async function anularLote(id){
-  const ap = S.aprob.find(a => a.id === id); if (!ap) return;
-  const pe = ap.items.filter(i => i.decision === 'pendiente').length;
-  if (!confirm(`¿Anular el lote de ${ap.consignanteNombre} del ${fmtFechaHora(ap.creado)}?\n\n${pe} libro(s) sin responder. El enlace dejará de funcionar. No cambia nada en los libros.`)) return;
-  const o = Object.assign({}, ap, { estado:'anulada', anuladoEl:new Date().toISOString(), anuladoPor:(S.user?S.user.email:'local') });
-  try { const g = await DB.guardar(COL.aprob, o); S.aprob[S.aprob.findIndex(a => a.id === id)] = g; }
-  catch(e){ return toast('No se pudo anular: ' + e.message, 'err'); }
-  pintarTodo(); toast('Lote anulado', 'ok');
 }
 
 /* ============================ VISTA PÚBLICA DEL CONSIGNANTE ============================ */
@@ -2256,24 +2118,17 @@ async function arrancarVistaPublica(token){
     if (!cfg){ $('#pubBody').innerHTML = '<div class="empty"><b>No pudimos abrir tus libros</b>Escríbenos por WhatsApp o Instagram y te ayudamos.</div>'; return; }
     try{
       if (!firebase.apps.length) firebase.initializeApp(cfg);
-      S.db = firebase.firestore();
-      // Los navegadores internos de WhatsApp e Instagram a veces bloquean la
-      // conexión continua de Firestore y la página se queda en blanco.
-      try { S.db.settings({ experimentalAutoDetectLongPolling:true, merge:true }); } catch(e){}
-      S.modo = 'nube';
+      S.db = firebase.firestore(); S.modo = 'nube';
     }catch(e){ $('#pubBody').innerHTML = '<div class="empty"><b>No se pudo abrir el enlace</b>' + esc(e.message) + '</div>'; return; }
   }
   try{
-    const espera = new Promise((_, no) => setTimeout(() => no(new Error('La conexión está tardando demasiado.')), 20000));
-    const ap = await Promise.race([DB.obtener(COL.aprob, token), espera]);
-    if (!ap || ap.estado === 'anulada'){ $('#pubBody').innerHTML = '<div class="empty"><b>Este enlace ya no está disponible</b>Escríbenos por Instagram y te enviamos uno nuevo.<br><small style="color:var(--ink-3)">Ref. ' + esc(token) + (ap ? ' · anulado' : ' · no encontrado') + '</small></div>'; return; }
+    const ap = await DB.obtener(COL.aprob, token);
+    if (!ap){ $('#pubBody').innerHTML = '<div class="empty"><b>Este enlace ya no está disponible</b>Escríbenos por Instagram y te enviamos uno nuevo.</div>'; return; }
     PUB = ap;
     S.cfg = Object.assign({}, CFG_DEF, { pctConsignante:(ap.condiciones||{}).pctCons||70, pctLibreria:(ap.condiciones||{}).pctLib||30, plazoDias:(ap.condiciones||{}).plazo||120 });
     pintarPublica();
   }catch(e){
-    $('#pubBody').innerHTML = '<div class="empty"><b>No se pudo leer el enlace</b>' + esc(e.message) +
-      '<br><br><button class="btn" onclick="location.reload()">Intentar de nuevo</button>' +
-      '<br><small>Si sigue igual, abre el enlace en Safari o Chrome (menú ⋯ → «Abrir en el navegador»).</small></div>';
+    $('#pubBody').innerHTML = '<div class="empty"><b>No se pudo leer el enlace</b>' + esc(e.message) + '</div>';
   }
 }
 
@@ -2475,8 +2330,11 @@ function registrarVentaRapida(){
   const raw = $('#ventaBusca').value.trim().toUpperCase();
   if (!raw) return;
   const isbn = limpiarISBN(raw);
+  const soloNum = raw.replace(/\D/g,'');
+  const porBarras = codigoSVDesdeBarras(soloNum);
   const cand = S.libros.filter(l =>
-    ((isbn.length >= 10 && limpiarISBN(l.isbn) === isbn) || (l.codigo||'').toUpperCase() === raw) &&
+    ((isbn.length >= 10 && limpiarISBN(l.isbn) === isbn) || (l.codigo||'').toUpperCase() === raw
+      || (porBarras && (l.codigo||'').toUpperCase() === porBarras)) &&
     ['aprobado','publicado','vencido'].includes(l.estado));
   $('#ventaBusca').value = '';
   if (!cand.length) return toast('No se encontró un libro disponible con ese código o ISBN','err');
@@ -2613,6 +2471,10 @@ function pintarPanel(){
   if (cnt('aprobado')) alertas.push(['t-verde', cnt('aprobado')+' libro(s) aprobados listos para publicar', "irA('inventario')"]);
   if (porPagar > 0) alertas.push(['t-terra', money(porPagar)+' por liquidar a consignantes', "irA('ventas')"]);
   if (cnt('vencido')) alertas.push(['t-rojo', cnt('vencido')+' libro(s) vencidos: avisar para retiro o extensión', "irA('inventario')"]);
+  const enEspera = L.filter(l => l.enEspera && !['vendido','pagado','retirado','rechazado'].includes(l.estado));
+  const liberables = enEspera.filter(l => l.stockNuevoActual === 0);
+  if (liberables.length) alertas.push(['t-verde', liberables.length + ' libro(s) en espera ya se pueden publicar: se acabó tu stock nuevo', "verEnEspera()"]);
+  if (enEspera.length - liberables.length > 0) alertas.push(['t-gris', (enEspera.length - liberables.length) + ' libro(s) en espera de que se acabe tu stock nuevo', "verEnEspera()"]);
   const sinTerm = S.cons.filter(c=>!c.aceptaTerminos).length;
   if (sinTerm) alertas.push(['t-rojo', sinTerm+' consignante(s) sin aceptar términos', "irA('consignantes')"]);
   $('#panelAlertas').innerHTML = alertas.length ? alertas.map(([c,t,p])=>
@@ -2869,7 +2731,9 @@ function aISO(fecha){ if(!fecha) return new Date().toISOString(); return String(
 /* --- Segunda Vida  →  POS --- */
 async function publicarEnPOS(ids, silencioso){
   if (S.modo !== 'nube') { if(!silencioso) toast('La conexión con el POS necesita la app en la nube','err'); return 0; }
-  const libros = ids.map(libroPorId).filter(l => l && l.aceptado !== false);
+  const frenados = ids.map(libroPorId).filter(l => l && l.enEspera).length;
+  if (frenados && !silencioso) toast(`${frenados} libro(s) en espera de stock no se enviaron al POS`,'err');
+  const libros = ids.map(libroPorId).filter(l => l && l.aceptado !== false && !l.enEspera);
   if (!libros.length) return 0;
   const mapa = [];
   try{
@@ -2888,13 +2752,18 @@ async function publicarEnPOS(ids, silencioso){
                  email:c.email||'', formaPago:c.formaPago||'', notas:'Segunda Vida', fecha:new Date().toISOString() };
           v.consignantes.push(pc);
         }
-        let pl = v.libros.find(x => x.code === l.codigo) || (l.posLibroId && v.libros.find(x => x.id === l.posLibroId));
+        const bc = codigoBarras(l.codigo) || l.codigo;
+        let pl = (l.posLibroId && v.libros.find(x => x.id === l.posLibroId))
+              || v.libros.find(x => x.code === bc)
+              || v.libros.find(x => x.code === l.codigo);
         if (pl){
           pl.precio = Number(l.precioFinal) || pl.precio;
           pl.titulo = l.titulo; pl.autor = l.autor || '';
           pl.consignanteId = pc.id;
+          pl.code = bc;                     // migra el código viejo "SV-0031" al EAN-13 escaneable
+          pl.codigoInterno = l.codigo;
         } else {
-          pl = { id: idPOS('lb'), code: l.codigo, titulo: l.titulo, autor: l.autor || '',
+          pl = { id: idPOS('lb'), code: bc, codigoInterno: l.codigo, titulo: l.titulo, autor: l.autor || '',
                  consignanteId: pc.id, precio: Number(l.precioFinal) || 0, estado:'disponible',
                  fechaIngreso: aISO(l.fechaIngreso), fechaVence: aISO(l.fechaLimite) };
           v.libros.push(pl);
@@ -2958,7 +2827,7 @@ async function quitarDelPOSConAviso(l, silencioso){
   let pl = null;
   try{
     const v = await leerConsignaPOS();
-    pl = v.libros.find(x => x.code === l.codigo || (l.posLibroId && x.id === l.posLibroId));
+    pl = v.libros.find(x => x.code === l.codigo || x.code === codigoBarras(l.codigo) || (l.posLibroId && x.id === l.posLibroId));
   }catch(e){ if(!silencioso) toast('No se pudo leer el POS: ' + e.message,'err'); return 0; }
   if (!pl){ if(!silencioso) toast('Este libro ya no está en el módulo del POS','ok'); return 0; }
   let forzar = false;
@@ -2966,7 +2835,7 @@ async function quitarDelPOSConAviso(l, silencioso){
     if (!confirm(`En el POS, "${l.titulo}" figura como VENDIDO.\n\nSi lo quitas, desaparece del historial de consignación del POS. Hazlo solo si esa venta fue anulada o eliminada.\n\n¿Quitarlo de todas formas?`)) return 0;
     forzar = true;
   }
-  return await quitarDelPOS([l.codigo, l.posLibroId].filter(Boolean), silencioso, forzar);
+  return await quitarDelPOS([l.codigo, codigoBarras(l.codigo), l.posLibroId].filter(Boolean), silencioso, forzar);
 }
 
 /* --- POS  →  Segunda Vida: ventas --- */
@@ -2977,7 +2846,7 @@ async function importarVentasPOS(avisar, vPrevio){
     const v = vPrevio || await leerConsignaPOS();
     for (const pl of v.libros){
       if (pl.estado !== 'vendido') continue;
-      const l = S.libros.find(x => x.posLibroId === pl.id || (x.codigo && x.codigo === pl.code));
+      const l = S.libros.find(x => x.posLibroId === pl.id || (x.codigo && (x.codigo === pl.code || codigoBarras(x.codigo) === pl.code)));
       if (!l || ['vendido','pagado','retirado'].includes(l.estado)) continue;
       const precio = Number(pl.precioVendido != null ? pl.precioVendido : pl.precio) || 0;
       const o = Object.assign({}, l);
@@ -2995,7 +2864,7 @@ async function importarVentasPOS(avisar, vPrevio){
     // aquí se revierte para que no quede un cobro fantasma en la liquidación.
     for (const l of S.libros){
       if (l.estado !== 'vendido' || !l.venta || l.venta.origen !== 'POS') continue;
-      const pl = v.libros.find(x => x.id === l.posLibroId || x.code === l.codigo);
+      const pl = v.libros.find(x => x.id === l.posLibroId || x.code === l.codigo || x.code === codigoBarras(l.codigo));
       if (!pl || pl.estado === 'vendido') continue;
       const o = Object.assign({}, l);
       o.estado = 'publicado';
@@ -3012,13 +2881,90 @@ async function importarVentasPOS(avisar, vPrevio){
   return n;
 }
 
+/* Relee el stock nuevo de los títulos que están en espera: cuando el POS llega
+   a cero, el libro ya puede salir a exhibición sin canibalizar una venta nueva. */
+async function revisarEsperaStock(){
+  if (S.modo !== 'nube' || !S.db) return 0;
+  const espera = S.libros.filter(l => l.enEspera && l.isbn && !['vendido','pagado','retirado','rechazado'].includes(l.estado));
+  if (!espera.length) return 0;
+  const isbns = [...new Set(espera.map(l => limpiarISBN(l.isbn)).filter(Boolean))];
+  const stock = {};
+  try{
+    for (let i = 0; i < isbns.length; i += 10){
+      const q = await S.db.collection('productos').where('code','in', isbns.slice(i, i+10)).get();
+      q.docs.forEach(d => { const pr = d.data(); stock[pr.code] = Number(pr.stock) || 0; });
+    }
+  }catch(e){ return 0; }
+  let libres = 0;
+  espera.forEach(l => {
+    const st = stock[limpiarISBN(l.isbn)];
+    l.stockNuevoActual = (st == null) ? 0 : st;
+    if (l.stockNuevoActual === 0) libres++;
+  });
+  return libres;
+}
+
+/* Reescribe en el POS el código de cada ejemplar en exhibición con su EAN-13.
+   No duplica nada: empareja por el identificador interno que ya quedó guardado. */
+async function migrarCodigosBarras(){
+  if (S.modo !== 'nube') return toast('Disponible solo con la app conectada a la nube','err');
+  const libros = S.libros.filter(l => ['aprobado','publicado','vencido'].includes(l.estado) && !l.enEspera && codigoBarras(l.codigo));
+  if (!libros.length) return toast('No hay libros en exhibición que actualizar','ok');
+  if (!confirm(`Se actualizará el código de ${libros.length} libro(s) en el módulo de consignación del POS, del formato SV-0000 al código de barras escaneable.\n\nNo se crea ni se borra ningún libro, y las ventas ya registradas no se tocan.\n\n¿Continuar?`)) return;
+  const n = await publicarEnPOS(libros.map(l=>l.id), true);
+  pintarTodo();
+  toast(n ? `${n} libro(s) actualizados en el POS. Ahora imprime sus etiquetas.` : 'No se pudo actualizar el POS', n?'ok':'err');
+}
+
+/* Lista de los libros detenidos porque el mismo título está en stock nuevo. */
+function verEnEspera(){
+  const L = S.libros.filter(l => l.enEspera && !['vendido','pagado','retirado','rechazado'].includes(l.estado))
+                    .sort((a,b)=>(a.stockNuevoActual||99)-(b.stockNuevoActual||99));
+  if (!L.length) return toast('No hay libros en espera','ok');
+  modal('Libros en espera de stock', `
+    <p class="sub">Estos libros tienen contrato y precio, pero no se exhiben porque el mismo título todavía está en tu stock nuevo.
+    Recuerda que el plazo de ${S.cfg.plazoDias} días les corre igual desde su fecha de ingreso.</p>
+    <div class="tw"><table><thead><tr><th>Código</th><th>Título</th><th>Consignante</th><th>Precio</th><th>Nuevos en POS</th><th>Vence</th><th></th></tr></thead>
+    <tbody>${L.map(l=>`<tr>
+      <td class="mono">${esc(l.codigo)}</td>
+      <td>${esc(l.titulo)}</td>
+      <td>${esc(l.consignanteNombre||'—')}</td>
+      <td><b>${money(l.precioFinal)}</b></td>
+      <td>${l.stockNuevoActual === 0 ? '<span class="tag t-verde">0 · listo</span>' : (l.stockNuevoActual != null ? l.stockNuevoActual : '—')}</td>
+      <td>${fmtFecha(l.fechaLimite)}</td>
+      <td style="text-align:right">${l.stockNuevoActual === 0
+        ? `<button class="btn sm" onclick="cerrarModal();liberarEspera('${l.id}')">Publicar</button>`
+        : `<button class="btn ghost sm" onclick="cerrarModal();liberarEspera('${l.id}')">Sacar de espera</button>`}</td>
+    </tr>`).join('')}</tbody></table></div>
+  `, [{t:'Cerrar', c:'ghost', f:cerrarModal},
+      {t:'Revisar stock ahora', c:'ghost', f:async()=>{ await revisarEsperaStock(); cerrarModal(); pintarTodo(); verEnEspera(); }}]);
+}
+
+/* Saca un libro de la espera y, si ya tenía precio aprobado, lo publica. */
+async function liberarEspera(id){
+  const l = Object.assign({}, libroPorId(id));
+  if (!l.id) return;
+  l.enEspera = false; delete l.esperaDesde; delete l.stockNuevoActual;
+  l.historial = (l.historial||[]).concat([{ f:new Date().toISOString(), e:l.estado, u:'liberado de espera' }]);
+  let g = await DB.guardar(COL.libros, l);
+  S.libros[S.libros.findIndex(x=>x.id===g.id)] = g;
+  if (g.estado === 'aprobado'){
+    g = await DB.guardar(COL.libros, Object.assign({}, g, { estado:'publicado',
+      historial:(g.historial||[]).concat([{ f:new Date().toISOString(), e:'publicado', u:(S.user?S.user.email:'local') }]) }));
+    S.libros[S.libros.findIndex(x=>x.id===g.id)] = g;
+    if (S.modo === 'nube' && S.cfg.sincronizarPOS !== false) await publicarEnPOS([id], true);
+    pintarTodo(); return toast(g.codigo + ' liberado y publicado','ok');
+  }
+  pintarTodo(); toast(g.codigo + ' ya no está en espera','ok');
+}
+
 /* Vigila que nadie dé de alta libros por el POS: Segunda Vida es la única puerta
    de entrada, porque es la que deja contrato y aprobación de precio. */
 async function revisarAltasPOS(vPrevio){
   if (S.modo !== 'nube' || S.cfg.sincronizarPOS === false){ S.altasPOS = []; return 0; }
   try{
     const v = vPrevio || await leerConsignaPOS();
-    S.altasPOS = v.libros.filter(pl => !S.libros.some(x => x.posLibroId === pl.id || x.codigo === pl.code));
+    S.altasPOS = v.libros.filter(pl => !S.libros.some(x => x.posLibroId === pl.id || x.codigo === pl.code || codigoBarras(x.codigo) === pl.code));
   }catch(e){ S.altasPOS = []; }
   return S.altasPOS.length;
 }
@@ -3307,6 +3253,98 @@ function descargarPDF(idDirecto, tipoDirecto){
   const nom = (tipo==='precios'?'precios':tipo==='anexo'?'anexo':'contrato') + '-segunda-vida-' + (c.cedula||nombreCons(c).replace(/\s+/g,'-').toLowerCase()) + '.pdf';
   doc.save(nom);
   toast((cfg.ruc && cfg.representante) ? 'PDF generado' : 'PDF generado · faltan RUC y representante en Ajustes', 'ok');
+}
+
+/* ================= CÓDIGO DE BARRAS INTERNO (EAN-13, prefijo 29) =================
+   El lector del POS descarta todo lo que no sea dígito y exige 6 o más, así que
+   "SV-0031" nunca se puede escanear. Cada ejemplar recibe además un EAN-13 propio
+   derivado de su número correlativo. GS1 reserva el rango 20-29 para uso interno
+   del comercio y los ISBN siempre empiezan en 978 o 979: la colisión es imposible. */
+function digitoEAN(cuerpo12){
+  let t = 0;
+  for (let i = 0; i < 12; i++) t += parseInt(cuerpo12[i],10) * (i % 2 ? 3 : 1);
+  return String((10 - t % 10) % 10);
+}
+function codigoBarras(codigoSV){
+  const n = parseInt(String(codigoSV||'').replace(/\D/g,''), 10);
+  if (!n || n > 999999999) return '';
+  const cuerpo = '290' + String(n).padStart(9,'0');
+  return cuerpo + digitoEAN(cuerpo);
+}
+function codigoSVDesdeBarras(code){
+  const c = String(code||'').replace(/\D/g,'');
+  if (c.length !== 13 || c.slice(0,3) !== '290') return '';
+  return 'SV-' + String(parseInt(c.slice(3,12),10)).padStart(4,'0');
+}
+
+const EAN_L = ['0001101','0011001','0010011','0111101','0100011','0110001','0101111','0111011','0110111','0001011'];
+const EAN_G = ['0100111','0110011','0011011','0100001','0011101','0111001','0000101','0010001','0001001','0010111'];
+const EAN_R = ['1110010','1100110','1101100','1000010','1011100','1001110','1010000','1000100','1001000','1110100'];
+const EAN_PAR = ['LLLLLL','LLGLGG','LLGGLG','LLGGGL','LGLLGG','LGGLLG','LGGGLL','LGLGLG','LGLGGL','LGGLGL'];
+
+function svgEAN13(code){
+  const c = String(code||'').replace(/\D/g,'');
+  if (c.length !== 13) return '';
+  const par = EAN_PAR[+c[0]];
+  let bits = '101';
+  for (let i = 1; i <= 6; i++) bits += (par[i-1] === 'L' ? EAN_L : EAN_G)[+c[i]];
+  bits += '01010';
+  for (let i = 7; i <= 12; i++) bits += EAN_R[+c[i]];
+  bits += '101';
+  const q = 9, H = 30, HG = 33.5;
+  const guia = i => i < 3 || (i >= 45 && i < 50) || i >= 92;
+  let barras = '';
+  for (let i = 0; i < 95; i++){
+    if (bits[i] !== '1') continue;
+    barras += '<rect x="' + (q+i) + '" y="0" width="1" height="' + (guia(i)?HG:H) + '"/>';
+  }
+  const txt = (x,t) => '<text x="' + x + '" y="40" font-family="Helvetica,Arial,sans-serif" font-size="8.5" text-anchor="middle">' + t + '</text>';
+  return '<svg viewBox="0 0 ' + (q*2+95) + ' 42" preserveAspectRatio="xMidYMid meet" shape-rendering="crispEdges" fill="#000">'
+       + barras + txt(q-4.5, c[0]) + txt(q+24, c.slice(1,7)) + txt(q+71, c.slice(7,13)) + '</svg>';
+}
+
+/* ---- hoja de etiquetas para pegar sobre el ISBN impreso ---- */
+let ETQ_LIBROS = [], ETQ_GUIAS = true;
+
+function abrirEtiquetas(ids){
+  const base = (ids && ids.length)
+    ? ids.map(libroPorId).filter(Boolean)
+    : S.libros.filter(l => ['aprobado','publicado','vencido'].includes(l.estado));
+  ETQ_LIBROS = base.filter(l => codigoBarras(l.codigo))
+                   .sort((a,b)=>(a.codigo||'').localeCompare(b.codigo||''));
+  if (!ETQ_LIBROS.length) return toast('No hay libros para etiquetar. Selecciona filas o publica libros primero.','err');
+  pintarEtiquetas();
+  $('#hojaEtiquetas').classList.remove('hide');
+  document.body.classList.add('imp-etq');
+}
+function cerrarEtiquetas(){
+  $('#hojaEtiquetas').classList.add('hide');
+  $('#hojaEtiquetas').innerHTML = '';
+  document.body.classList.remove('imp-etq');
+}
+function toggleGuias(el){ ETQ_GUIAS = el.checked; pintarEtiquetas(); }
+
+function pintarEtiquetas(){
+  const hojas = [];
+  for (let i = 0; i < ETQ_LIBROS.length; i += 24) hojas.push(ETQ_LIBROS.slice(i, i+24));
+  const una = l => {
+    const c = consPorId(l.consignanteId) || {};
+    return '<div class="etq">'
+      + '<div><div class="etq-tit">' + esc((l.titulo||'').slice(0,60)) + '</div>'
+      + '<div class="etq-aut">' + esc((l.autor||'').slice(0,40)) + '</div></div>'
+      + '<div class="etq-bc">' + svgEAN13(codigoBarras(l.codigo)) + '</div>'
+      + '<div class="etq-pie"><span>' + esc(l.codigo) + (c.codigo ? ' · ' + esc(c.codigo) : '')
+      + '</span><span class="etq-marca">SEGUNDA VIDA</span><b>' + money(l.precioFinal) + '</b></div></div>';
+  };
+  $('#hojaEtiquetas').innerHTML =
+    '<div class="barra">'
+    + '<b style="font-size:13px">' + ETQ_LIBROS.length + ' etiqueta(s) · ' + hojas.length + ' hoja(s) A4</b>'
+    + '<label class="check" style="margin:0;padding:6px 10px"><input type="checkbox" ' + (ETQ_GUIAS?'checked':'') + ' onchange="toggleGuias(this)"><span>Guías de corte</span></label>'
+    + '<button class="btn" onclick="window.print()">Imprimir</button>'
+    + '<button class="btn ghost" onclick="cerrarEtiquetas()">Cerrar</button>'
+    + '<span class="sub" style="width:100%;text-align:center;margin:0">Pega cada etiqueta <b>sobre el código de barras impreso del libro</b>: así lo único escaneable es el ejemplar usado.</span>'
+    + '</div>'
+    + hojas.map(h => '<div class="hoja' + (ETQ_GUIAS?' guias':'') + '">' + h.map(una).join('') + '</div>').join('');
 }
 
 /* ============================ EXPORTAR CSV ============================ */
