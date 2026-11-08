@@ -1491,8 +1491,8 @@ function abrirLibro(id, esNuevo, pre){
     <details class="sec" ${faltanDatos && !nuevo ? 'open' : ''}><summary>Más datos del libro <em>ISBN, editorial, año, categoría, portada</em></summary><div class="in">
       <div class="grid g2">
         <label class="f"><span>ISBN</span><input type="text" id="lIsbn" class="mono" value="${esc(l.isbn||'')}"></label>
-        ${id && codigoBarras(l.codigo) ? `<label class="f"><span>Código de barras de La Madriguera <em>— el que se escanea en caja</em></span>
-          <input type="text" class="mono" value="${codigoBarras(l.codigo)}" readonly onclick="this.select()"></label>` : ''}
+        ${id && barrasDe(l) ? `<label class="f"><span>Código de barras de La Madriguera <em>— el que se escanea en caja</em></span>
+          <input type="text" class="mono" value="${barrasDe(l)}" readonly onclick="this.select()"></label>` : ''}
         <label class="f"><span>Editorial</span><input type="text" id="lEd" value="${esc(l.editorial||'')}"></label>
         <label class="f"><span>Año</span><input type="number" id="lAnio" value="${esc(l.anio||'')}" onchange="autoAntiguedad()"></label>
         <label class="f"><span>Categoría</span><select id="lCat" onchange="autoDemanda()">
@@ -1880,7 +1880,7 @@ async function cambiarEstado(id, nuevo, silencioso){
   S.libros[S.libros.findIndex(x=>x.id===id)] = saved;
   if (nuevo === 'publicado' && S.cfg.sincronizarPOS !== false) await publicarEnPOS([id], true);
   if (['retirado','rechazado'].includes(nuevo) && S.cfg.sincronizarPOS !== false)
-    await quitarDelPOS([l.codigo, codigoBarras(l.codigo), l.posLibroId].filter(Boolean), true);
+    await quitarDelPOS([l.codigo, barrasDe(l), l.posLibroId].filter(Boolean), true);
   if (!silencioso){ cerrarModal(); pintarTodo(); toast('Situación actualizada','ok'); }
 }
 
@@ -2060,7 +2060,7 @@ async function sincronizarAprobaciones(avisar){
             l.motivoRechazo = 'Precio no aprobado por el consignante';
             if (l.estado !== 'vendido' && l.estado !== 'pagado'){
               l.estado = 'aceptado';
-              if (S.cfg.sincronizarPOS !== false) await quitarDelPOS([l.codigo, codigoBarras(l.codigo), l.posLibroId].filter(Boolean), true);
+              if (S.cfg.sincronizarPOS !== false) await quitarDelPOS([l.codigo, barrasDe(l), l.posLibroId].filter(Boolean), true);
             }
           }
           l.historial = (l.historial||[]).concat([{ f:it.fecha||new Date().toISOString(),
@@ -2331,10 +2331,11 @@ function registrarVentaRapida(){
   if (!raw) return;
   const isbn = limpiarISBN(raw);
   const soloNum = raw.replace(/\D/g,'');
-  const porBarras = codigoSVDesdeBarras(soloNum);
+  const esBarras = soloNum.length === 13 && soloNum.slice(0,3) === '290';
   const cand = S.libros.filter(l =>
-    ((isbn.length >= 10 && limpiarISBN(l.isbn) === isbn) || (l.codigo||'').toUpperCase() === raw
-      || (porBarras && (l.codigo||'').toUpperCase() === porBarras)) &&
+    ((isbn.length >= 10 && !esBarras && limpiarISBN(l.isbn) === isbn)
+      || (l.codigo||'').toUpperCase() === raw
+      || (esBarras && barrasDe(l) === soloNum)) &&
     ['aprobado','publicado','vencido'].includes(l.estado));
   $('#ventaBusca').value = '';
   if (!cand.length) return toast('No se encontró un libro disponible con ese código o ISBN','err');
@@ -2752,7 +2753,7 @@ async function publicarEnPOS(ids, silencioso){
                  email:c.email||'', formaPago:c.formaPago||'', notas:'Segunda Vida', fecha:new Date().toISOString() };
           v.consignantes.push(pc);
         }
-        const bc = codigoBarras(l.codigo) || l.codigo;
+        const bc = asignarBarras(l) || l.codigo;
         let pl = (l.posLibroId && v.libros.find(x => x.id === l.posLibroId))
               || v.libros.find(x => x.code === bc)
               || v.libros.find(x => x.code === l.codigo);
@@ -2827,7 +2828,7 @@ async function quitarDelPOSConAviso(l, silencioso){
   let pl = null;
   try{
     const v = await leerConsignaPOS();
-    pl = v.libros.find(x => x.code === l.codigo || x.code === codigoBarras(l.codigo) || (l.posLibroId && x.id === l.posLibroId));
+    pl = v.libros.find(x => x.code === l.codigo || x.code === barrasDe(l) || (l.posLibroId && x.id === l.posLibroId));
   }catch(e){ if(!silencioso) toast('No se pudo leer el POS: ' + e.message,'err'); return 0; }
   if (!pl){ if(!silencioso) toast('Este libro ya no está en el módulo del POS','ok'); return 0; }
   let forzar = false;
@@ -2835,7 +2836,7 @@ async function quitarDelPOSConAviso(l, silencioso){
     if (!confirm(`En el POS, "${l.titulo}" figura como VENDIDO.\n\nSi lo quitas, desaparece del historial de consignación del POS. Hazlo solo si esa venta fue anulada o eliminada.\n\n¿Quitarlo de todas formas?`)) return 0;
     forzar = true;
   }
-  return await quitarDelPOS([l.codigo, codigoBarras(l.codigo), l.posLibroId].filter(Boolean), silencioso, forzar);
+  return await quitarDelPOS([l.codigo, barrasDe(l), l.posLibroId].filter(Boolean), silencioso, forzar);
 }
 
 /* --- POS  →  Segunda Vida: ventas --- */
@@ -2846,7 +2847,7 @@ async function importarVentasPOS(avisar, vPrevio){
     const v = vPrevio || await leerConsignaPOS();
     for (const pl of v.libros){
       if (pl.estado !== 'vendido') continue;
-      const l = S.libros.find(x => x.posLibroId === pl.id || (x.codigo && (x.codigo === pl.code || codigoBarras(x.codigo) === pl.code)));
+      const l = S.libros.find(x => x.posLibroId === pl.id || (x.codigo && (x.codigo === pl.code || barrasDe(x) === pl.code)));
       if (!l || ['vendido','pagado','retirado'].includes(l.estado)) continue;
       const precio = Number(pl.precioVendido != null ? pl.precioVendido : pl.precio) || 0;
       const o = Object.assign({}, l);
@@ -2864,7 +2865,7 @@ async function importarVentasPOS(avisar, vPrevio){
     // aquí se revierte para que no quede un cobro fantasma en la liquidación.
     for (const l of S.libros){
       if (l.estado !== 'vendido' || !l.venta || l.venta.origen !== 'POS') continue;
-      const pl = v.libros.find(x => x.id === l.posLibroId || x.code === l.codigo || x.code === codigoBarras(l.codigo));
+      const pl = v.libros.find(x => x.id === l.posLibroId || x.code === l.codigo || x.code === barrasDe(l));
       if (!pl || pl.estado === 'vendido') continue;
       const o = Object.assign({}, l);
       o.estado = 'publicado';
@@ -2910,8 +2911,8 @@ async function migrarCodigosBarras(){
   if (S.modo !== 'nube') return toast('Disponible solo con la app conectada a la nube','err');
   // Solo los que YA están en el módulo del POS: esta función reescribe códigos,
   // nunca pone a la venta un libro que todavía no habías publicado.
-  const libros = S.libros.filter(l => l.posLibroId && !l.enEspera && codigoBarras(l.codigo)
-                                   && !['retirado','rechazado'].includes(l.estado));
+  const libros = S.libros.filter(l => l.posLibroId && !l.enEspera && numDeCodigo(l.codigo)
+                                   && !['retirado','rechazado','vendido','pagado'].includes(l.estado));
   if (!libros.length) return toast('No hay libros en el POS que actualizar','ok');
   if (!confirm(`Se actualizará el código de ${libros.length} libro(s) en el módulo de consignación del POS, del formato SV-0000 al código de barras escaneable.\n\nNo se crea ni se borra ningún libro, y las ventas ya registradas no se tocan.\n\n¿Continuar?`)) return;
   const n = await publicarEnPOS(libros.map(l=>l.id), true);
@@ -2967,7 +2968,7 @@ async function revisarAltasPOS(vPrevio){
   if (S.modo !== 'nube' || S.cfg.sincronizarPOS === false){ S.altasPOS = []; return 0; }
   try{
     const v = vPrevio || await leerConsignaPOS();
-    S.altasPOS = v.libros.filter(pl => !S.libros.some(x => x.posLibroId === pl.id || x.codigo === pl.code || codigoBarras(x.codigo) === pl.code));
+    S.altasPOS = v.libros.filter(pl => !S.libros.some(x => x.posLibroId === pl.id || x.codigo === pl.code || barrasDe(x) === pl.code));
   }catch(e){ S.altasPOS = []; }
   return S.altasPOS.length;
 }
@@ -3268,11 +3269,38 @@ function digitoEAN(cuerpo12){
   for (let i = 0; i < 12; i++) t += parseInt(cuerpo12[i],10) * (i % 2 ? 3 : 1);
   return String((10 - t % 10) % 10);
 }
-function codigoBarras(codigoSV){
-  const n = parseInt(String(codigoSV||'').replace(/\D/g,''), 10);
-  if (!n || n > 999999999) return '';
-  const cuerpo = '290' + String(n).padStart(9,'0');
-  return cuerpo + digitoEAN(cuerpo);
+function cuerpoBarras(n){
+  const c = '290' + String(n).padStart(9,'0');
+  return c + digitoEAN(c);
+}
+/* Los códigos reales son de dos familias: SV-0031 (alta en esta app) y
+   CG26878743 (importados del POS). De ambos se toman sus dígitos. */
+function numDeCodigo(codigo){
+  const d = String(codigo||'').replace(/\D/g,'');
+  if (!d) return 0;
+  return parseInt(d.slice(-9), 10) || 0;
+}
+function codigoBarras(codigo){
+  const n = numDeCodigo(codigo);
+  return n ? cuerpoBarras(n) : '';
+}
+/* El código de barras vive guardado en el libro (campo "barras"): así no depende
+   de volver a interpretar el texto del código y nunca cambia después de impreso. */
+function barrasDe(l){
+  if (!l) return '';
+  if (l.barras) return l.barras;
+  return codigoBarras(l.codigo);
+}
+function asignarBarras(l){
+  if (!l) return '';
+  if (l.barras) return l.barras;
+  let n = numDeCodigo(l.codigo);
+  if (!n) return '';
+  const usados = new Set(S.libros.filter(x => x.id !== l.id && x.barras).map(x => x.barras));
+  let c = cuerpoBarras(n), vueltas = 0;
+  while (usados.has(c) && vueltas < 200){ n++; c = cuerpoBarras(n); vueltas++; }
+  l.barras = c;
+  return c;
 }
 function codigoSVDesdeBarras(code){
   const c = String(code||'').replace(/\D/g,'');
@@ -3309,13 +3337,22 @@ function svgEAN13(code){
 /* ---- hoja de etiquetas para pegar sobre el ISBN impreso ---- */
 let ETQ_LIBROS = [], ETQ_GUIAS = true;
 
-function abrirEtiquetas(ids){
+async function abrirEtiquetas(ids){
   const base = (ids && ids.length)
     ? ids.map(libroPorId).filter(Boolean)
     : S.libros.filter(l => ['aprobado','publicado','vencido'].includes(l.estado));
-  ETQ_LIBROS = base.filter(l => codigoBarras(l.codigo))
+  ETQ_LIBROS = base.filter(l => asignarBarras(l))
                    .sort((a,b)=>(a.codigo||'').localeCompare(b.codigo||''));
   if (!ETQ_LIBROS.length) return toast('No hay libros para etiquetar. Selecciona filas o publica libros primero.','err');
+  // Se guarda el código de barras recién asignado para que no cambie nunca más
+  for (const l of ETQ_LIBROS){
+    if (l.barrasGuardado) continue;
+    try{
+      const g = await DB.guardar(COL.libros, Object.assign({}, l, { barrasGuardado:true }));
+      S.libros[S.libros.findIndex(x=>x.id===g.id)] = g;
+    }catch(e){ }
+  }
+  ETQ_LIBROS = ETQ_LIBROS.map(l => libroPorId(l.id) || l);
   pintarEtiquetas();
   $('#hojaEtiquetas').classList.remove('hide');
   document.body.classList.add('imp-etq');
@@ -3335,7 +3372,7 @@ function pintarEtiquetas(){
     return '<div class="etq">'
       + '<div><div class="etq-tit">' + esc((l.titulo||'').slice(0,60)) + '</div>'
       + '<div class="etq-aut">' + esc((l.autor||'').slice(0,40)) + '</div></div>'
-      + '<div class="etq-bc">' + svgEAN13(codigoBarras(l.codigo)) + '</div>'
+      + '<div class="etq-bc">' + svgEAN13(barrasDe(l)) + '</div>'
       + '<div class="etq-pie"><span>' + esc(l.codigo) + (c.codigo ? ' · ' + esc(c.codigo) : '')
       + '</span><span class="etq-marca">SEGUNDA VIDA</span><b>' + money(l.precioFinal) + '</b></div></div>';
   };
