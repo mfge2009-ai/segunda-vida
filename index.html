@@ -581,6 +581,19 @@ details.sec > .in{padding:2px 13px 12px}
     </div>
     <p class="sub" style="margin-top:10px">Para escribir en el POS hace falta rol <b>admin</b> o <b>pos</b>. Un usuario con rol <b>consig</b> puede usar toda la app, pero no sincronizar.</p>
   </div>
+  <div class="card">
+    <h3>Catálogo de la página web</h3>
+    <p class="sub">La web tiene su propia copia del catálogo, en otro proyecto de Firebase. Esta app la compara con tu inventario y te avisa cuando no coinciden: libros que la web sigue ofreciendo y ya vendiste, o libros en exhibición que nadie ve en internet.</p>
+    <label class="check"><input type="checkbox" id="cfgWeb">
+      <span><b>Revisar la web automáticamente.</b> En cada sincronización se compara el catálogo publicado contra tu inventario.</span></label>
+    <label class="f"><span>Dirección de la página</span><input type="text" id="cfgUrlWeb" class="mono" placeholder="https://lamadriguera.ec/"></label>
+    <div class="row">
+      <button class="btn ghost" onclick="revisarWeb(true)">Revisar la web ahora</button>
+      <button class="btn ghost" onclick="conectarWeb()">Conectar con la web</button>
+    </div>
+    <div id="estadoWeb" class="sub" style="margin-top:10px"></div>
+    <p class="sub">Para <b>leer</b> no hace falta nada: el catálogo de la web es público. Para que esta app pueda <b>corregirlo</b> sola, conéctate una vez con la cuenta dueña del sitio; la sesión queda guardada en este equipo.</p>
+  </div>
   <div class="row"><button class="btn" onclick="guardarAjustes()">Guardar ajustes</button>
     <button class="btn ghost" onclick="cargarDemo()">Cargar datos de ejemplo</button>
     <button class="btn ghost" onclick="respaldar()">Descargar respaldo JSON</button>
@@ -636,6 +649,8 @@ const S = {
   camStream:null, camLoop:null,
   altasPOS: [],         // libros creados directamente en el POS, sin ficha aquí
   liqPendientesPOS: 0,  // pagos hechos aquí que el POS todavía no refleja
+  web: null, webUser: null,              // conexión con el catálogo de la página web
+  desfaseWeb: { fantasmas:[], faltantes:[] },
 };
 
 /* ---------------- configuración por defecto ---------------- */
@@ -644,7 +659,7 @@ const CFG_DEF = {
   precioMinimo:3, redondeo:0.5, sincronizarPOS:true,
   nombre:'LA MADRIGUERA — CAFÉ Y LIBROS', ruc:'', representante:'',
   ciudad:'Guayaquil', direccion:'Urdesa Central, Guayaquil',
-  urlPublica:'',
+  urlPublica:'', urlWeb:'', sincronizarWeb:true,
   factores:{
     estado:   { nuevo:0.70, muy_bueno:0.60, bueno:0.50, aceptable:0.35 },
     demanda:  { alta:1.10, media:1.00, baja:0.85 },
@@ -949,6 +964,7 @@ async function sincronizarEnSegundoPlano(){
       }
       await revisarEsperaStock();
       await refrescarEstados();
+      if (S.cfg.sincronizarWeb !== false) await revisarWeb(false).catch(()=>{});
     }
     pintarTodo();
     estadoSync('Al día · ' + new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}), 'ok');
@@ -2520,6 +2536,175 @@ async function enviarDecisiones(){
   }
 }
 
+/* ===================== CATÁLOGO DE LA PÁGINA WEB =====================
+   La web vive en OTRO proyecto de Firebase (adminpagweb) y tiene su propia
+   copia del catálogo en la colección 'consig'. Esa copia es de lectura
+   pública, así que esta app puede compararla sin credenciales; para escribir
+   hace falta iniciar sesión una vez con la cuenta dueña de la web.
+   Los documentos creados desde aquí llevan id 'sv_<código>', que es la
+   convención que ya traía la web: así nunca se duplican.                  */
+
+const LS_WEB = 'sv_webcfg';
+const URL_WEB_DEF = 'https://lamadriguera.ec/';
+
+/* La página trae DOS configuraciones (la suya y la del POS). Para no mezclarlas
+   se acota la búsqueda al objeto literal que contiene ese projectId. */
+function extraerCfgDe(texto, proyecto){
+  const i = texto.search(new RegExp('projectId\\s*:\\s*["\']' + proyecto + '["\']'));
+  if (i < 0) return null;
+  const ini = texto.lastIndexOf('{', i), fin = texto.indexOf('}', i);
+  if (ini < 0 || fin < 0) return null;
+  const win = texto.slice(ini, fin + 1);
+  const cfg = { projectId: proyecto };
+  ['apiKey','authDomain','storageBucket','messagingSenderId','appId','measurementId']
+    .forEach(k => { const m = win.match(new RegExp(k + '\\s*:\\s*["\']([^"\']+)["\']')); if (m) cfg[k] = m[1]; });
+  return cfg.apiKey ? cfg : null;
+}
+
+/* Lee la configuración del proyecto de la web desde la propia página. */
+async function detectarConfigWeb(){
+  try{ const g = localStorage.getItem(LS_WEB); if (g) return JSON.parse(g); }catch(e){}
+  if (S.cfg.webCfg) { try{ localStorage.setItem(LS_WEB, JSON.stringify(S.cfg.webCfg)); }catch(e){} return S.cfg.webCfg; }
+  const url = (S.cfg.urlWeb || URL_WEB_DEF).trim();
+  const proyecto = (S.cfg.proyectoWeb || 'adminpagweb').trim();
+  try{
+    const r = await fetch(url, { cache:'no-store' });
+    if (!r.ok) return null;
+    const cfg = extraerCfgDe(await r.text(), proyecto);
+    if (cfg){ try{ localStorage.setItem(LS_WEB, JSON.stringify(cfg)); }catch(e){} }
+    return cfg;
+  }catch(e){ return null; }
+}
+
+async function appWeb(){
+  if (S.web) return S.web;
+  if (S.modo !== 'nube' || typeof firebase === 'undefined') return null;
+  const cfg = await detectarConfigWeb();
+  if (!cfg) return null;
+  try{
+    const app = firebase.apps.find(a => a.name === 'web') || firebase.initializeApp(cfg, 'web');
+    S.web = app.firestore();
+    try{ app.auth().onAuthStateChanged(u => { S.webUser = u; }); }catch(e){}
+    return S.web;
+  }catch(e){ return null; }
+}
+
+async function leerCatalogoWeb(){
+  const db = await appWeb(); if (!db) return null;
+  const q = await db.collection('consig').get();
+  return q.docs.map(d => Object.assign({ docId:d.id }, d.data()));
+}
+
+const claveWeb = x => String((x && (x.code || x.isbn)) || '').trim().toUpperCase();
+const disponibleSV = l => ['aprobado','publicado','vencido'].includes(l.estado) && !l.enEspera;
+const fueraSV = l => ['vendido','pagado','retirado','rechazado'].includes(l.estado) || l.enEspera;
+
+/* Compara el inventario con lo que la web está ofreciendo. */
+function compararWeb(cat){
+  const porClave = {};
+  (cat||[]).forEach(x => { const k = claveWeb(x); if (k) porClave[k] = x; });
+  const fantasmas = [], faltantes = [];
+  S.libros.forEach(l => {
+    const k = String(l.codigo||'').trim().toUpperCase();
+    const w = porClave[k] || porClave[String(l.isbn||'').trim().toUpperCase()];
+    if (fueraSV(l) && w && !/vendid/i.test(w.estado||'')) fantasmas.push({ libro:l, web:w });
+    if (disponibleSV(l) && (!w || /vendid/i.test(w.estado||''))) faltantes.push({ libro:l, web:w||null });
+  });
+  return { fantasmas, faltantes };
+}
+
+async function revisarWeb(avisar){
+  const cat = await leerCatalogoWeb();
+  if (!cat){ if (avisar) toast('No se pudo leer el catálogo de la web. Revisa la dirección en Ajustes.','err'); return null; }
+  S.desfaseWeb = compararWeb(cat);
+  if (avisar){ pintarTodo(); verDesfaseWeb(); }
+  return S.desfaseWeb;
+}
+
+/* Iniciar sesión en el proyecto de la web, solo para poder escribir. */
+async function conectarWeb(){
+  const db = await appWeb();
+  if (!db) return toast('Primero hay que detectar la configuración de la web (Ajustes)','err');
+  try{
+    const app = firebase.app('web');
+    const prov = new firebase.auth.GoogleAuthProvider();
+    const res = await app.auth().signInWithPopup(prov);
+    S.webUser = res.user;
+    toast('Conectado a la web como ' + (res.user.email||''),'ok');
+    pintarTodo();
+  }catch(e){ toast('No se pudo conectar con la web: ' + (e.code||e.message),'err'); }
+}
+
+function slugWeb(l){
+  return [l.titulo, l.autor, l.codigo].filter(Boolean).join(' ')
+    .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'').slice(0,90);
+}
+
+function docWebDeLibro(l, estado){
+  const id = 'sv_' + l.codigo;
+  return { id, sv: l.codigo, code: l.codigo, isbn: l.isbn || '',
+    title: l.titulo || '', author: l.autor || '', editorial: l.editorial || '',
+    genre: l.categoria || '', cat: '',
+    condicion: 'Usado ' + String(ESTADOS_FISICOS[l.estadoFisico] || '').toLowerCase(),
+    sinopsis: (l.descripcion || '').replace(/\s+/g,' ').slice(0,600),
+    imagen: l.portadaUrl || '', price: Number(l.precioFinal) || 0,
+    estado: estado || 'En venta', order: Date.now(),
+    origen: 'Segunda Vida', posId: l.posLibroId || '', webSlug: slugWeb(l) };
+}
+
+async function publicarLibroEnWeb(l){
+  const db = await appWeb(); if (!db) return false;
+  try{ await db.collection('consig').doc('sv_' + l.codigo).set(docWebDeLibro(l,'En venta'), { merge:true }); return true; }
+  catch(e){ return false; }
+}
+async function marcarVendidoEnWeb(docId){
+  const db = await appWeb(); if (!db) return false;
+  try{ await db.collection('consig').doc(docId).set({ estado:'Vendido' }, { merge:true }); return true; }
+  catch(e){ return false; }
+}
+
+/* Aplica todo lo que está desfasado, en los dos sentidos. */
+async function sincronizarWeb(avisar){
+  const db = await appWeb();
+  if (!db){ if (avisar) toast('No hay conexión con la web','err'); return 0; }
+  const d = S.desfaseWeb || { fantasmas:[], faltantes:[] };
+  let n = 0, fallos = 0;
+  for (const f of d.fantasmas){ (await marcarVendidoEnWeb(f.web.docId)) ? n++ : fallos++; }
+  for (const f of d.faltantes){ (await publicarLibroEnWeb(f.libro)) ? n++ : fallos++; }
+  await revisarWeb(false);
+  pintarTodo();
+  if (avisar) toast(fallos ? `${n} aplicados · ${fallos} fallaron (¿sesión de la web iniciada?)`
+                           : (n ? `${n} cambio(s) aplicados en la web` : 'La web ya estaba al día'), fallos?'err':'ok');
+  return n;
+}
+
+function verDesfaseWeb(){
+  const d = S.desfaseWeb || { fantasmas:[], faltantes:[] };
+  const conectado = !!(S.webUser);
+  const fila = (t, sub, der) => `<tr><td><b>${esc(t)}</b><br><small style="color:var(--ink-3)">${esc(sub)}</small></td><td style="text-align:right;white-space:nowrap">${der}</td></tr>`;
+  modal('La web contra tu inventario', `
+    ${conectado ? `<div class="note ok">Conectada como <b>${esc(S.webUser.email||'')}</b>: puedo aplicar los cambios por ti.</div>`
+                : `<div class="note warn">Solo estoy <b>leyendo</b> la web. Para que pueda corregirla sola, pulsa <b>Conectar con la web</b> e inicia sesión con la cuenta dueña del sitio.</div>`}
+    <h4 style="margin:14px 0 6px;font-size:13px">Ofrecidos en la web pero ya no disponibles <span class="tag ${d.fantasmas.length?'t-rojo':'t-verde'}">${d.fantasmas.length}</span></h4>
+    <p class="sub">Un cliente podría pedirlos y ya no los tienes.</p>
+    ${d.fantasmas.length ? `<div class="tw"><table><tbody>${d.fantasmas.map(f=>fila(
+        f.web.title || f.libro.titulo,
+        (SITUACIONES[f.libro.estado]||{t:f.libro.estado}).t + ' · ' + f.libro.codigo,
+        money(f.web.price||f.libro.precioFinal))).join('')}</tbody></table></div>` : '<p class="sub">Nada pendiente.</p>'}
+    <h4 style="margin:16px 0 6px;font-size:13px">En exhibición pero ausentes de la web <span class="tag ${d.faltantes.length?'t-oro':'t-verde'}">${d.faltantes.length}</span></h4>
+    <p class="sub">Los tienes en la mesa y nadie los ve en internet.</p>
+    ${d.faltantes.length ? `<div class="tw"><table><tbody>${d.faltantes.slice(0,40).map(f=>fila(
+        f.libro.titulo, f.libro.autor || f.libro.codigo, money(f.libro.precioFinal))).join('')}
+        ${d.faltantes.length>40?`<tr><td colspan="2" class="sub">y ${d.faltantes.length-40} más…</td></tr>`:''}</tbody></table></div>` : '<p class="sub">Nada pendiente.</p>'}
+  `, [
+    {t:'Cerrar', c:'ghost', f:cerrarModal},
+    {t:'Volver a revisar', c:'ghost', f:()=>{ cerrarModal(); revisarWeb(true); }},
+    conectado ? {t:`Aplicar ${d.fantasmas.length + d.faltantes.length} cambio(s)`, f:async()=>{ cerrarModal(); await sincronizarWeb(true); }}
+              : {t:'Conectar con la web', f:async()=>{ cerrarModal(); await conectarWeb(); await revisarWeb(true); }}
+  ]);
+}
+
 /* ================= SEGUIMIENTO PARA EL CONSIGNANTE =================
    Un enlace propio y permanente por consignante donde ve en qué va cada libro:
    cuáles siguen en exhibición, cuáles se vendieron y cuánto le toca, y qué ya
@@ -2868,6 +3053,9 @@ function pintarPanel(){
   if (cnt('aprobado')) alertas.push(['t-verde', cnt('aprobado')+' libro(s) aprobados listos para publicar', "irA('inventario')"]);
   if (porPagar > 0) alertas.push(['t-terra', money(porPagar)+' por liquidar a consignantes', "irA('ventas')"]);
   if (cnt('vencido')) alertas.push(['t-rojo', cnt('vencido')+' libro(s) vencidos: avisar para retiro o extensión', "irA('inventario')"]);
+  const dw = S.desfaseWeb || { fantasmas:[], faltantes:[] };
+  if (dw.fantasmas.length) alertas.push(['t-rojo', dw.fantasmas.length + ' libro(s) que la web sigue ofreciendo y ya no tienes', "verDesfaseWeb()"]);
+  if (dw.faltantes.length) alertas.push(['t-oro', dw.faltantes.length + ' libro(s) en exhibición que no están publicados en la web', "verDesfaseWeb()"]);
   if (S.liqPendientesPOS) alertas.push(['t-oro', S.liqPendientesPOS + ' libro(s) pagados que el POS todavía cuenta como pendientes', "conciliarLiquidaciones(true)"]);
   const desac = itemsEnDesacuerdo().length;
   if (desac) alertas.push(['t-rojo', desac + ' libro(s) con precio no aprobado esperan tu respuesta', "irA('aprobaciones')"]);
@@ -2981,6 +3169,15 @@ function pintarAjustes(){
         <input type="number" step="0.01" min="0" data-f="${grupo}" data-k="${k}" value="${v}"></label>`).join('')}</div>`).join('');
   $('#cfgGoogleKey').value = c.googleKey || '';
   $('#cfgPOS').checked = c.sincronizarPOS !== false;
+  $('#cfgWeb').checked = c.sincronizarWeb !== false;
+  $('#cfgUrlWeb').value = c.urlWeb || '';
+  const ew = $('#estadoWeb');
+  if (ew){
+    const d = S.desfaseWeb || { fantasmas:[], faltantes:[] };
+    ew.innerHTML = (S.webUser ? '<span class="tag t-verde">Conectada</span> como ' + esc(S.webUser.email||'')
+                              : '<span class="tag t-gris">Solo lectura</span> todavía sin conectar')
+      + ' · ' + d.fantasmas.length + ' ofrecido(s) de más · ' + d.faltantes.length + ' sin publicar';
+  }
   $('#estadoConn').innerHTML = S.modo === 'local'
     ? 'Modo local: los datos viven solo en este navegador. Para trabajar entre computadora y celular y para que el consignante apruebe por enlace, conecta Firebase.'
     : `Conectado a Firebase · proyecto <b class="mono">${esc((leerCfgGuardada()||FIREBASE_CONFIG_FIJA||{}).projectId||'—')}</b> · usuario <b>${esc(S.user?S.user.email:'')}</b> · rol <b>${esc(S.rol||'sin rol asignado')}</b><br>Colecciones: <span class="mono">${Object.values(COL).join(' · ')}</span>`;
@@ -2998,6 +3195,7 @@ async function guardarAjustes(){
   c.nombre = $('#cfgNombre').value.trim(); c.ruc = $('#cfgRuc').value.trim();
   c.representante = $('#cfgRep').value.trim(); c.ciudad = $('#cfgCiudad').value.trim();
   c.direccion = $('#cfgDir').value.trim(); c.urlPublica = $('#cfgUrl').value.trim();
+  c.sincronizarWeb = $('#cfgWeb').checked; c.urlWeb = $('#cfgUrlWeb').value.trim();
   c.googleKey = $('#cfgGoogleKey').value.trim();
   c.sincronizarPOS = $('#cfgPOS').checked;
   $$('#cfgFactores input').forEach(i => { c.factores[i.dataset.f][i.dataset.k] = parseFloat(i.value)||0; });
