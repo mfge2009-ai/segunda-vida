@@ -577,6 +577,7 @@ details.sec > .in{padding:2px 13px 12px}
       <button class="btn ghost" onclick="importarDesdePOS()">Importar la consignación que ya está en el POS</button>
       <button class="btn ghost" onclick="verEstadoPOS()">Ver qué hay en el POS</button>
       <button class="btn ghost" onclick="migrarCodigosBarras()">Actualizar códigos de barras en el POS</button>
+      <button class="btn ghost" onclick="conciliarLiquidaciones(true)">Conciliar liquidaciones con el POS</button>
     </div>
     <p class="sub" style="margin-top:10px">Para escribir en el POS hace falta rol <b>admin</b> o <b>pos</b>. Un usuario con rol <b>consig</b> puede usar toda la app, pero no sincronizar.</p>
   </div>
@@ -633,7 +634,8 @@ const S = {
   cfg:null,
   db:null, auth:null,
   camStream:null, camLoop:null,
-  altasPOS: []          // libros creados directamente en el POS, sin ficha aquí
+  altasPOS: [],         // libros creados directamente en el POS, sin ficha aquí
+  liqPendientesPOS: 0,  // pagos hechos aquí que el POS todavía no refleja
 };
 
 /* ---------------- configuración por defecto ---------------- */
@@ -937,7 +939,12 @@ async function sincronizarEnSegundoPlano(){
     if (S.modo === 'nube' && S.cfg.sincronizarPOS !== false){
       // Una sola lectura del documento del POS sirve para ventas y para altas
       const v = await leerConsignaPOS().catch(()=>null);
-      if (v){ await importarVentasPOS(false, v); await revisarAltasPOS(v); }
+      if (v){
+        await importarVentasPOS(false, v);
+        await revisarAltasPOS(v);
+        await importarLiquidacionesPOS(false, v);
+        S.liqPendientesPOS = liquidacionesSinEnviar(v).length;
+      }
       await revisarEsperaStock();
     }
     pintarTodo();
@@ -2615,7 +2622,11 @@ function liquidar(consId){
       const saved = await DB.guardar(COL.libros, o);
       S.libros[S.libros.findIndex(x=>x.id===o.id)] = saved;
     }
-    cerrarModal(); pintarTodo(); toast('Pago registrado · ' + money(total),'ok');
+    const avisado = await empujarLiquidacionPOS(c, libros, metodo, ref);
+    cerrarModal(); pintarTodo();
+    toast('Pago registrado · ' + money(total) + (avisado ? ' · el POS ya lo sabe' : ''), 'ok');
+    if (!avisado && S.modo === 'nube' && S.cfg.sincronizarPOS !== false)
+      toast('No se pudo avisar al POS: concilia desde Ajustes para que su saldo baje','err');
   }}]);
 }
 
@@ -2682,6 +2693,7 @@ function pintarPanel(){
   if (cnt('aprobado')) alertas.push(['t-verde', cnt('aprobado')+' libro(s) aprobados listos para publicar', "irA('inventario')"]);
   if (porPagar > 0) alertas.push(['t-terra', money(porPagar)+' por liquidar a consignantes', "irA('ventas')"]);
   if (cnt('vencido')) alertas.push(['t-rojo', cnt('vencido')+' libro(s) vencidos: avisar para retiro o extensión', "irA('inventario')"]);
+  if (S.liqPendientesPOS) alertas.push(['t-oro', S.liqPendientesPOS + ' libro(s) pagados que el POS todavía cuenta como pendientes', "conciliarLiquidaciones(true)"]);
   const desac = itemsEnDesacuerdo().length;
   if (desac) alertas.push(['t-rojo', desac + ' libro(s) con precio no aprobado esperan tu respuesta', "irA('aprobaciones')"]);
   const enEspera = L.filter(l => l.enEspera && !['vendido','pagado','retirado','rechazado'].includes(l.estado));
@@ -3049,6 +3061,113 @@ async function quitarDelPOSConAviso(l, silencioso){
     forzar = true;
   }
   return await quitarDelPOS([l.codigo, barrasDe(l), l.posLibroId].filter(Boolean), silencioso, forzar);
+}
+
+/* --- Liquidaciones: las dos puertas se avisan entre sí -------------------
+   El pago se puede registrar aquí o en el POS. Pase donde pase, la otra app se
+   entera: así nadie ve como pendiente una plata que ya se entregó, ni se paga
+   dos veces. Todo es idempotente: un libro ya pagado nunca se vuelve a marcar
+   y una liquidación no se duplica aunque se sincronice cien veces.          */
+
+function librosLiquidadosEnPOS(v){
+  const set = new Set();
+  ((v && v.liquidaciones) || []).forEach(l => (l.libroIds||[]).forEach(id => set.add(id)));
+  return set;
+}
+
+/* Segunda Vida → POS: deja constancia del pago para que su saldo baje a cero. */
+async function empujarLiquidacionPOS(c, libros, metodo, referencia){
+  if (S.modo !== 'nube' || S.cfg.sincronizarPOS === false) return false;
+  const ids = libros.map(l => l.posLibroId).filter(Boolean);
+  if (!ids.length) return false;
+  try{
+    await S.db.runTransaction(async tx => {
+      const ref = refConsignaPOS();
+      const doc = await tx.get(ref);
+      const v = (doc.exists && doc.data().v) || { consignantes:[], libros:[], liquidaciones:[] };
+      v.liquidaciones = v.liquidaciones || [];
+      const ya = librosLiquidadosEnPOS(v);
+      const nuevos = ids.filter(id => !ya.has(id));
+      if (!nuevos.length) return;
+      const incluidos = libros.filter(l => nuevos.includes(l.posLibroId));
+      const totalVenta = incluidos.reduce((a,l) => a + ((l.venta && l.venta.precioVenta) || 0), 0);
+      const pago = Math.round(totalVenta * Number(S.cfg.pctConsignante)) / 100;
+      v.liquidaciones.push({
+        id: 'lq' + Date.now() + Math.random().toString(36).slice(2,5),
+        consignanteId: c.posId || '',
+        fecha: new Date().toISOString(),
+        periodo: hoyISO().slice(0,7),
+        libroIds: nuevos,
+        totalVenta: +totalVenta.toFixed(2),
+        pago: +pago.toFixed(2), pago60: +pago.toFixed(2),
+        pctConsignante: Number(S.cfg.pctConsignante) / 100,
+        metodo: metodo || '', referencia: referencia || '',
+        origen: 'Segunda Vida',
+        user: (S.user ? S.user.email : 'local')
+      });
+      tx.set(ref, { v }, { merge:true });
+    });
+    return true;
+  }catch(e){ return false; }
+}
+
+/* POS → Segunda Vida: un pago registrado en caja marca los libros como pagados. */
+async function importarLiquidacionesPOS(avisar, vPrevio){
+  if (S.modo !== 'nube' || S.cfg.sincronizarPOS === false) return 0;
+  let n = 0;
+  try{
+    const v = vPrevio || await leerConsignaPOS();
+    const porLibro = new Map();
+    ((v && v.liquidaciones) || []).forEach(liq => (liq.libroIds||[]).forEach(id => { if (!porLibro.has(id)) porLibro.set(id, liq); }));
+    if (!porLibro.size) return 0;
+    for (const l of S.libros.slice()){
+      if (l.estado !== 'vendido' || !l.venta || !l.posLibroId) continue;
+      const liq = porLibro.get(l.posLibroId);
+      if (!liq) continue;
+      const o = Object.assign({}, l);
+      o.pago = { fecha: liq.fecha || new Date().toISOString(),
+                 metodo: liq.metodo || 'Registrado en el POS',
+                 referencia: 'Liquidación registrada en el POS' + (liq.id ? ' · ' + liq.id : ''),
+                 monto: l.venta.montoConsignante, origen: 'POS', liqId: liq.id || '' };
+      o.estado = 'pagado';
+      o.historial = (o.historial||[]).concat([{ f:new Date().toISOString(), e:'pagado', u:'POS · liquidación' }]);
+      const g = await DB.guardar(COL.libros, o);
+      const i = S.libros.findIndex(x => x.id === g.id); if (i>=0) S.libros[i] = g;
+      n++;
+    }
+  }catch(e){ if (avisar) toast('No se pudieron traer las liquidaciones del POS: ' + e.message,'err'); return 0; }
+  if (avisar){ pintarTodo(); toast(n ? `${n} libro(s) marcados como pagados desde el POS` : 'No hay liquidaciones nuevas en el POS','ok'); }
+  return n;
+}
+
+/* Libros ya pagados aquí que el POS todavía cuenta como pendientes. */
+function liquidacionesSinEnviar(v){
+  const ya = librosLiquidadosEnPOS(v);
+  return S.libros.filter(l => l.estado === 'pagado' && l.posLibroId && !ya.has(l.posLibroId));
+}
+
+/* Revisa las dos direcciones y repara lo que falte. */
+async function conciliarLiquidaciones(avisar){
+  if (S.modo !== 'nube') { if (avisar) toast('Disponible solo con la app conectada a la nube','err'); return 0; }
+  let v;
+  try{ v = await leerConsignaPOS(); }
+  catch(e){ if (avisar) toast('No se pudo leer el POS: ' + e.message,'err'); return 0; }
+  const traidos = await importarLiquidacionesPOS(false, v);
+  const faltan = liquidacionesSinEnviar(v);
+  let enviados = 0;
+  const porCons = {};
+  faltan.forEach(l => { (porCons[l.consignanteId] = porCons[l.consignanteId] || []).push(l); });
+  for (const consId of Object.keys(porCons)){
+    const c = consPorId(consId); if (!c) continue;
+    const libros = porCons[consId];
+    const metodo = (libros[0].pago && libros[0].pago.metodo) || '';
+    const refer = 'Pago registrado en Segunda Vida';
+    if (await empujarLiquidacionPOS(c, libros, metodo, refer)) enviados += libros.length;
+  }
+  try{ S.liqPendientesPOS = liquidacionesSinEnviar(await leerConsignaPOS()).length; }catch(e){}
+  pintarTodo();
+  if (avisar) toast(`Conciliado · ${traidos} libro(s) marcados como pagados aquí, ${enviados} informados al POS`, 'ok');
+  return traidos + enviados;
 }
 
 /* --- POS  →  Segunda Vida: ventas --- */
