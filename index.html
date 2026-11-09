@@ -769,6 +769,8 @@ async function iniciar(){
   const h = location.hash || '';
   const mAp = h.match(/#\/aprobar\/([A-Za-z0-9_-]+)/);
   if (mAp){ return arrancarVistaPublica(mAp[1]); }
+  const mEs = h.match(/#\/estado\/([A-Za-z0-9_-]+)/);
+  if (mEs){ return arrancarVistaPublica(mEs[1], true); }
 
   $('#gate').classList.remove('hide');
   const modo = localStorage.getItem(LS.modo);
@@ -946,6 +948,7 @@ async function sincronizarEnSegundoPlano(){
         S.liqPendientesPOS = liquidacionesSinEnviar(v).length;
       }
       await revisarEsperaStock();
+      await refrescarEstados();
     }
     pintarTodo();
     estadoSync('Al día · ' + new Date().toLocaleTimeString('es-EC',{hour:'2-digit',minute:'2-digit'}), 'ok');
@@ -1000,7 +1003,7 @@ function pintarTodo(){
 }
 function pintarBadges(){
   if (!S.cfg) return;
-  const pend = S.aprob.filter(a=>a.estado==='pendiente').length + itemsEnDesacuerdo().length;
+  const pend = S.aprob.filter(a=>a.estado==='pendiente' && a.tipo!=='estado').length + itemsEnDesacuerdo().length;
   const bg = $('#bgApro'); bg.textContent = pend; bg.classList.toggle('hide', !pend);
 }
 
@@ -1025,6 +1028,7 @@ function pintarConsignantes(){
       <td>${c.aceptaTerminos?'<span class="tag t-verde">Aceptados</span>':'<span class="tag t-rojo">Pendiente</span>'}</td>
       <td style="text-align:right;white-space:nowrap">
         <button class="btn ghost sm" onclick="verConsignante('${c.id}')">Ficha</button>
+        <button class="btn ghost sm" onclick="mostrarEstado('${c.id}')" title="Enviarle el enlace donde ve cómo van sus libros">Seguimiento</button>
         <button class="btn ghost sm" onclick="irIngresoCon('${c.id}')" title="Ingresar libros de esta persona">+ Libros</button>
       </td></tr>`;
   }).join('');
@@ -1144,6 +1148,7 @@ function verConsignante(id){
     {t:'Cerrar', c:'ghost', f:cerrarModal},
     {t:'Editar datos', c:'ghost', f:()=>abrirConsignante(id)},
     {t:'Contrato + anexo PDF', c:'ghost', f:()=>descargarPDF(id, 'completo')},
+    {t:'Enviar seguimiento', c:'ghost', f:()=>{ cerrarModal(); mostrarEstado(id); }},
     sinEnviar ? {t:`Enviar ${sinEnviar} a aprobación`, c:'ghost', f:()=>{ cerrarModal(); enviarAAprobacionDe(id); }} : null,
     porPagar > 0 ? {t:'Registrar pago ' + money(porPagar), c:'ghost', f:()=>{ cerrarModal(); liquidar(id); }} : null,
     {t:'Ingresar libros', f:()=>irIngresoCon(id)}
@@ -2007,9 +2012,10 @@ Recuerda: si el libro se vende recibes el ${S.cfg.pctConsignante}% del precio, y
 /* Libros cuyo precio la consignante no aprobó y que todavía esperan tu respuesta. */
 function itemsEnDesacuerdo(){
   const out = [];
-  S.aprob.forEach(ap => (ap.items||[]).forEach((it, ix) => {
-    if (it.decision === 'rechazado' && !it.resuelto) out.push({ ap, it, ix });
-  }));
+  S.aprob.forEach(ap => { if (ap.tipo === 'estado') return;
+    (ap.items||[]).forEach((it, ix) => {
+      if (it.decision === 'rechazado' && !it.resuelto) out.push({ ap, it, ix });
+    }); });
   return out.sort((a,b)=>(b.it.fecha||'').localeCompare(a.it.fecha||''));
 }
 
@@ -2173,7 +2179,7 @@ function pintarAprobaciones(){
         </tr>`).join('')}
       </tbody></table></div>
     </div>`;
-  const lista = S.aprob.slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));
+  const lista = S.aprob.filter(a=>a.tipo!=='estado').slice().sort((a,b)=>(b.creado||'').localeCompare(a.creado||''));
   $('#listaAprob').innerHTML = lista.length ? lista.map(ap=>{
     const ok = ap.items.filter(i=>i.decision==='aprobado').length;
     const no = ap.items.filter(i=>i.decision==='rechazado').length;
@@ -2212,6 +2218,7 @@ async function sincronizarAprobaciones(avisar){
   try{
     if (avisar) S.aprob = await DB.lista(COL.aprob);
     for (const ap of S.aprob){
+      if (ap.tipo === 'estado') continue;
       for (const it of (ap.items||[])){
         if (it.decision === 'pendiente') continue;
         const l = libroPorId(it.libroId);
@@ -2271,7 +2278,7 @@ async function sincronizarAprobaciones(avisar){
 /* ============================ VISTA PÚBLICA DEL CONSIGNANTE ============================ */
 let PUB = null;
 
-async function arrancarVistaPublica(token){
+async function arrancarVistaPublica(token, esEstado){
   $('#pubView').classList.remove('hide');
   $('#pubBody').innerHTML = '<div class="empty">Cargando tus libros…</div>';
   const modo = localStorage.getItem(LS.modo);
@@ -2290,7 +2297,8 @@ async function arrancarVistaPublica(token){
     if (!ap){ $('#pubBody').innerHTML = '<div class="empty"><b>Este enlace ya no está disponible</b>Escríbenos por Instagram y te enviamos uno nuevo.</div>'; return; }
     PUB = ap;
     S.cfg = Object.assign({}, CFG_DEF, { pctConsignante:(ap.condiciones||{}).pctCons||70, pctLibreria:(ap.condiciones||{}).pctLib||30, plazoDias:(ap.condiciones||{}).plazo||120 });
-    pintarPublica();
+    if (esEstado || ap.tipo === 'estado') pintarEstadoPublico();
+    else pintarPublica();
   }catch(e){
     $('#pubBody').innerHTML = '<div class="empty"><b>No se pudo leer el enlace</b>' + esc(e.message) + '</div>';
   }
@@ -2512,6 +2520,171 @@ async function enviarDecisiones(){
   }
 }
 
+/* ================= SEGUIMIENTO PARA EL CONSIGNANTE =================
+   Un enlace propio y permanente por consignante donde ve en qué va cada libro:
+   cuáles siguen en exhibición, cuáles se vendieron y cuánto le toca, y qué ya
+   se le pagó. Se guarda como una foto del momento en la misma colección que
+   las aprobaciones (que ya es de lectura pública por token), con tipo 'estado'
+   e items vacío a propósito: así la sincronización de decisiones nunca lo toca.
+   La foto se refresca sola en cada sincronización cuando algo cambia.        */
+
+function urlEstado(token){
+  const base = (S.cfg.urlPublica || '').trim() || (location.origin + location.pathname);
+  return base.replace(/#.*$/,'') + '#/estado/' + token;
+}
+
+function resumenEstado(consId){
+  const L = S.libros.filter(l => l.consignanteId === consId && !['rechazado'].includes(l.estado));
+  const enEx = L.filter(l => ['aprobado','publicado','vencido'].includes(l.estado) && !l.enEspera);
+  const espera = L.filter(l => l.enEspera && !['vendido','pagado','retirado'].includes(l.estado));
+  const vend = L.filter(l => l.estado === 'vendido');
+  const pag = L.filter(l => l.estado === 'pagado');
+  const porCobrar = vend.reduce((a,l) => a + ((l.venta && l.venta.montoConsignante) || 0), 0);
+  const yaCobrado = pag.reduce((a,l) => a + ((l.venta && l.venta.montoConsignante) || 0), 0);
+  const linea = (l, grupo) => ({
+    grupo, codigo:l.codigo||'', titulo:l.titulo||'', autor:l.autor||'',
+    precio: Number(l.precioFinal || l.precioSugerido || 0),
+    tuyo: +(((l.venta && l.venta.montoConsignante) != null)
+            ? l.venta.montoConsignante
+            : (Number(l.precioFinal||0) * Number(S.cfg.pctConsignante) / 100)).toFixed(2),
+    fechaLimite: l.fechaLimite || '',
+    dias: l.fechaLimite ? diasEntre(hoyISO(), l.fechaLimite) : null,
+    fechaVenta: (l.venta && l.venta.fecha) || '',
+    fechaPago: (l.pago && l.pago.fecha) || '',
+    metodoPago: (l.pago && l.pago.metodo) || ''
+  });
+  return {
+    resumen: {
+      enExhibicion: enEx.length, enEspera: espera.length,
+      vendidos: vend.length, pagados: pag.length,
+      porCobrar: +porCobrar.toFixed(2), yaCobrado: +yaCobrado.toFixed(2),
+      valorExhibicion: +enEx.reduce((a,l)=>a+(Number(l.precioFinal)||0),0).toFixed(2)
+    },
+    lineas: enEx.map(l=>linea(l,'exhibicion'))
+      .concat(espera.map(l=>linea(l,'espera')))
+      .concat(vend.sort((a,b)=>((b.venta&&b.venta.fecha)||'').localeCompare((a.venta&&a.venta.fecha)||'')).map(l=>linea(l,'vendido')))
+      .concat(pag.map(l=>linea(l,'pagado')))
+  };
+}
+
+async function generarEstado(consId, silencioso){
+  const c = consPorId(consId);
+  if (!c) return null;
+  const r = resumenEstado(consId);
+  if (!r.lineas.length && !silencioso) { toast('Este consignante todavía no tiene libros que mostrar','err'); return null; }
+  let token = c.tokenEstado;
+  if (!token){
+    token = 'e' + uid() + Math.random().toString(36).slice(2,8);
+    const gc = await DB.guardar(COL.cons, Object.assign({}, c, { tokenEstado: token }));
+    const i = S.cons.findIndex(x=>x.id===gc.id); if (i>=0) S.cons[i] = gc;
+  }
+  const previo = S.aprob.find(a => a.id === token) || {};
+  const doc = Object.assign({}, previo, {
+    id: token, token, tipo: 'estado', estado: 'completa',
+    consignanteId: consId, consignanteNombre: nombreCons(c),
+    creado: previo.creado || new Date().toISOString(),
+    generado: new Date().toISOString(),
+    items: [],
+    condiciones: { pctCons:S.cfg.pctConsignante, pctLib:S.cfg.pctLibreria, plazo:S.cfg.plazoDias, libreria:S.cfg.nombre },
+    resumen: r.resumen, lineas: r.lineas
+  });
+  const saved = await DB.guardar(COL.aprob, doc);
+  const j = S.aprob.findIndex(a => a.id === saved.id);
+  if (j >= 0) S.aprob[j] = saved; else S.aprob.push(saved);
+  return saved;
+}
+
+/* Mantiene al día las fotos ya entregadas, sin que haya que reenviar el enlace. */
+async function refrescarEstados(){
+  let n = 0;
+  for (const c of S.cons){
+    if (!c.tokenEstado) continue;
+    const doc = S.aprob.find(a => a.id === c.tokenEstado);
+    const r = resumenEstado(c.id);
+    if (doc && JSON.stringify(doc.resumen) === JSON.stringify(r.resumen)) continue;
+    try{ await generarEstado(c.id, true); n++; }catch(e){}
+  }
+  return n;
+}
+
+async function mostrarEstado(consId){
+  const saved = await generarEstado(consId);
+  if (!saved) return;
+  const c = consPorId(consId) || {};
+  const url = urlEstado(saved.token);
+  const r = saved.resumen;
+  const nombre = (c.nombres||'').split(' ')[0];
+  const msg = `Hola ${nombre}, te comparto cómo van tus libros en Segunda Vida de La Madriguera 🌿
+${r.enExhibicion} en exhibición · ${r.vendidos + r.pagados} vendido(s)${r.porCobrar ? ` · ${money(r.porCobrar)} por pagarte` : ''}
+Puedes revisar el detalle cuando quieras aquí:
+${url}
+El enlace es tuyo y se mantiene al día solo.`;
+  modal('Seguimiento de ' + nombreCons(c), `
+    <div class="grid g4" style="margin-bottom:12px">
+      <div class="kpi"><div class="n">${r.enExhibicion}</div><div class="l">En exhibición</div></div>
+      <div class="kpi t"><div class="n">${r.vendidos + r.pagados}</div><div class="l">Vendidos</div></div>
+      <div class="kpi v"><div class="n">${money(r.porCobrar)}</div><div class="l">Por pagarle</div></div>
+      <div class="kpi"><div class="n">${money(r.yaCobrado)}</div><div class="l">Ya cobrado</div></div>
+    </div>
+    ${S.cfg.urlPublica ? '' : '<div class="note warn">Para enviarlo por WhatsApp, guarda primero en Ajustes la dirección web donde publicaste la app.</div>'}
+    <label class="f"><span>Enlace permanente de ${esc(nombreCons(c))}</span>
+      <input type="text" class="mono" value="${esc(url)}" onclick="this.select()" readonly></label>
+    <label class="f"><span>Mensaje listo para enviar</span><textarea style="min-height:130px" readonly onclick="this.select()">${esc(msg)}</textarea></label>
+    <p class="sub">Este enlace no cambia: se lo mandas una vez y lo puede consultar siempre. Se actualiza solo cada vez que se vende o se paga uno de sus libros.</p>
+  `, [
+    {t:'Cerrar', c:'ghost', f:cerrarModal},
+    {t:'Copiar mensaje', c:'ghost', f:()=>{ navigator.clipboard.writeText(msg).then(()=>toast('Mensaje copiado','ok')).catch(()=>toast('Selecciona y copia a mano','err')); }},
+    {t:'Ver como lo ve ella', c:'ghost', f:()=>{ cerrarModal(); location.hash = '#/estado/' + saved.token; location.reload(); }},
+    c.telefono ? {t:'Enviar por WhatsApp', f:()=>{ abrirWhatsapp(c.telefono, msg); cerrarModal(); }} : null
+  ].filter(Boolean));
+}
+
+/* --- lo que ve el consignante --- */
+function pintarEstadoPublico(){
+  const ap = PUB;
+  const r = ap.resumen || {};
+  const L = ap.lineas || [];
+  const nombre = (ap.consignanteNombre||'').split(' ')[0];
+  const grupo = (clave, titulo, nota, pinta) => {
+    const items = L.filter(x => x.grupo === clave);
+    if (!items.length) return '';
+    return `<div class="card" style="margin-top:14px"><h3>${titulo} <span class="tag t-gris">${items.length}</span></h3>
+      ${nota ? `<p class="sub" style="margin-bottom:10px">${nota}</p>` : ''}
+      ${items.map(pinta).join('')}</div>`;
+  };
+  const fila = (izq, der) => `<div class="row" style="padding:9px 0;border-bottom:1px solid var(--surface-2);align-items:flex-start">
+      <div style="flex:1;min-width:0">${izq}</div><div style="text-align:right;white-space:nowrap">${der}</div></div>`;
+  const tit = x => `<b style="font-size:13.5px">${esc(x.titulo)}</b>${x.autor?`<br><small style="color:var(--ink-3)">${esc(x.autor)}</small>`:''}`;
+
+  $('#pubBody').innerHTML = `
+    <div class="pub-hero">
+      <div class="eyebrow">Segunda Vida</div>
+      <h1>${esc(nombre?('Hola, '+nombre):'Tus libros')} 🌿</h1>
+      <p>Así van tus libros en La Madriguera. De cada libro que se vende recibes el <b>${S.cfg.pctConsignante}%</b> del precio.</p>
+    </div>
+    <div class="grid" style="grid-template-columns:1fr 1fr;margin-bottom:4px">
+      <div class="kpi"><div class="n">${r.enExhibicion||0}</div><div class="l">En exhibición</div></div>
+      <div class="kpi t"><div class="n">${(r.vendidos||0)+(r.pagados||0)}</div><div class="l">Vendidos</div></div>
+      <div class="kpi v"><div class="n">${money(r.porCobrar||0)}</div><div class="l">Por pagarte</div></div>
+      <div class="kpi"><div class="n">${money(r.yaCobrado||0)}</div><div class="l">Ya te pagamos</div></div>
+    </div>
+    ${grupo('vendido','Vendidos, pendientes de pago','El pago se hace dentro de los primeros 5 días hábiles del mes siguiente a la venta.',
+      x => fila(tit(x) + `<br><small style="color:var(--ink-3)">Vendido el ${fmtFecha(x.fechaVenta)}</small>`,
+                `<b style="color:var(--verde);font-size:15px">${money(x.tuyo)}</b><br><small style="color:var(--ink-3)">de ${money(x.precio)}</small>`))}
+    ${grupo('exhibicion','En exhibición','Están en la mesa de Segunda Vida esperando comprador.',
+      x => fila(tit(x) + (x.dias!=null ? `<br><small style="color:var(--ink-3)">${x.dias<0?'Plazo vencido, conversemos':('Quedan '+x.dias+' días de exhibición')}</small>` : ''),
+                `<b>${money(x.precio)}</b><br><small style="color:var(--ink-3)">recibes ${money(x.tuyo)}</small>`))}
+    ${grupo('espera','En espera','Los tenemos reservados y entran a la mesa apenas se libere el espacio.',
+      x => fila(tit(x), `<b>${money(x.precio)}</b>`))}
+    ${grupo('pagado','Ya pagados','',
+      x => fila(tit(x) + `<br><small style="color:var(--ink-3)">Pagado el ${fmtFecha(x.fechaPago)}${x.metodoPago?' · '+esc(x.metodoPago):''}</small>`,
+                `<b>${money(x.tuyo)}</b>`))}
+    ${L.length ? '' : '<div class="empty"><b>Todavía no hay libros registrados</b>Escríbenos y lo revisamos.</div>'}
+    <p class="sub" style="text-align:center;margin:18px 0 0">Actualizado el ${fmtFechaHora(ap.generado)}<br>Si algo no te cuadra, escríbenos y lo revisamos contigo.</p>
+  `;
+  document.querySelectorAll('.sticky-bar').forEach(e=>e.remove());
+}
+
 /* ============================ VENTAS Y PAGOS ============================ */
 function pintarVentas(){
   const vendidos = S.libros.filter(l=>['vendido','pagado'].includes(l.estado));
@@ -2538,7 +2711,9 @@ function pintarVentas(){
       <td>${g.libros.length}</td><td>${money(g.venta)}</td>
       <td><b style="color:var(--verde)">${money(g.cons)}</b></td><td>${money(g.lib)}</td>
       <td>${esc(c.formaPago||'—')}${c.datosPago?'<br><small style="color:var(--ink-3)">'+esc(c.datosPago)+'</small>':''}</td>
-      <td style="text-align:right"><button class="btn sm" onclick="liquidar('${id}')">Registrar pago</button></td></tr>`;
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn ghost sm" onclick="mostrarEstado('${id}')">Seguimiento</button>
+        <button class="btn sm" onclick="liquidar('${id}')">Registrar pago</button></td></tr>`;
   }).join('');
   $('#emptyLiq').innerHTML = filas.length ? '' : `<div class="empty"><b>No hay pagos pendientes</b>Cuando registres una venta, aquí aparece cuánto le toca a cada consignante.</div>`;
 }
