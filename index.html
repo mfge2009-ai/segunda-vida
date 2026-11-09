@@ -2060,6 +2060,55 @@ function abrirContraoferta(apId, ix){
   ]);
 }
 
+/* Después de responder un desacuerdo, el mensaje para la consignante queda escrito
+   y a un clic de enviarse: no hay que volver a buscarla en el panel. */
+function mensajeResultado(ap, it, accion){
+  const nombre = (ap.consignanteNombre||'').split(' ')[0] || '';
+  const hola = 'Hola ' + nombre + ', ';
+  const tit = '«' + (it.titulo||'') + '»';
+  if (accion === 'aceptar'){
+    return hola + 'aceptamos tu precio de ' + money(it.precio) + ' para ' + tit + ' 🌿\n\n'
+      + 'Ya quedó registrado y el libro vuelve a exhibición en La Madriguera. '
+      + 'Te avisamos apenas se venda y recibes el ' + S.cfg.pctConsignante + '% de ese precio.';
+  }
+  if (accion === 'contra'){
+    const suya = (it.precioSugerido ? 'Revisamos tu propuesta de ' + money(it.precioSugerido) + ' para ' + tit + ' y '
+                                    : 'Revisamos lo que nos dijiste sobre ' + tit + ' y ');
+    return hola + 'gracias por contarnos lo que pensabas del precio.\n\n'
+      + suya + 'podemos ofrecerte ' + money(it.precio) + '.\n\n'
+      + 'Si estás de acuerdo, apruébalo aquí:\n' + urlAprobacion(ap.token);
+  }
+  return hola + 'sobre ' + tit + ': entendemos que el precio de ' + money(it.precio) + ' no te convence, '
+    + 'así que por ahora lo dejamos fuera de exhibición.\n\n'
+    + 'Puedes pasar a retirarlo cuando gustes, o escríbenos si prefieres que lo conversemos de nuevo.';
+}
+
+function avisarResultado(ap, it, accion){
+  const c = consPorId(ap.consignanteId) || {};
+  const msg = mensajeResultado(ap, it, accion);
+  const titulo = accion === 'aceptar' ? 'Precio aceptado · avísale'
+               : accion === 'contra'  ? 'Contraoferta lista · avísale'
+               : 'Se mantiene tu precio · avísale';
+  const encabezado = accion === 'aceptar'
+      ? `${esc(it.titulo)} queda en <b>${money(it.precio)}</b> y vuelve a exhibición.`
+      : accion === 'contra'
+      ? `Le ofreces <b>${money(it.precio)}</b> por ${esc(it.titulo)}. Lo verá en el mismo enlace que ya tiene.`
+      : `${esc(it.titulo)} se queda en ${money(it.precio)} y fuera de exhibición.`;
+  const botones = [
+    {t:'Ahora no', c:'ghost', f:cerrarModal},
+    {t:'Copiar mensaje', c:'ghost', f:()=>{ navigator.clipboard.writeText(msg).then(()=>toast('Mensaje copiado','ok')).catch(()=>toast('Selecciona y copia a mano','err')); }}
+  ];
+  if (c.telefono) botones.push({t:'Enviar por WhatsApp', f:()=>{ abrirWhatsapp(c.telefono, msg); cerrarModal(); }});
+  modal(titulo, `
+    <p class="sub" style="margin-bottom:10px">${encabezado}</p>
+    <div class="note ${c.telefono?'ok':'warn'}" style="margin-bottom:10px">
+      ${c.telefono ? ('Se envía a <b>'+esc(nombreCons(c))+'</b> · '+esc(c.telefono))
+                   : ('<b>'+esc(nombreCons(c))+'</b> no tiene celular registrado. Copia el mensaje y mándaselo por donde la contactes.')}
+    </div>
+    <label class="f"><span>Mensaje</span><textarea style="min-height:140px" readonly onclick="this.select()">${esc(msg)}</textarea></label>
+  `, botones);
+}
+
 async function resolverDesacuerdo(apId, ix, accion, precioNuevo){
   const ap = S.aprob.find(a=>a.id===apId); if(!ap) return;
   const it = ap.items[ix]; if(!it) return;
@@ -2096,9 +2145,7 @@ async function resolverDesacuerdo(apId, ix, accion, precioNuevo){
   ap.estado = (ap.items||[]).some(i2=>i2.decision==='pendiente') ? 'pendiente' : 'completa';
   await DB.guardar(COL.aprob, ap);
   pintarTodo();
-  toast(accion === 'aceptar' ? 'Precio actualizado y aprobado · publícalo cuando quieras'
-      : accion === 'contra'  ? 'Contraoferta lista · avísale por WhatsApp para que la revise'
-      : 'Se mantiene tu precio. El libro queda fuera de exhibición.', 'ok');
+  avisarResultado(ap, it, accion);
 }
 
 function pintarAprobaciones(){
@@ -2242,6 +2289,13 @@ async function arrancarVistaPublica(token){
   }
 }
 
+/* Con el contrato aceptado, lo que ya quedó respondido no se puede volver a tocar:
+   el documento es la constancia de lo acordado. Lo que la librería reabra con una
+   contraoferta vuelve a quedar pendiente y sí se puede responder. */
+function enFirme(ap, it){
+  return !!(ap && ap.contrato && ap.contrato.aceptado && it && it.decision !== 'pendiente');
+}
+
 function pintarPublica(){
   const ap = PUB;
   const nombre = (ap.consignanteNombre||'').split(' ')[0];
@@ -2262,6 +2316,7 @@ function pintarPublica(){
            Aprueba los que estés de acuerdo. Si alguno no te convence, dinos qué precio te parecería justo: lo revisamos y te respondemos.</p>`}
     </div>
     ${ap.estado==='completa' ? '<div class="note ok">Ya registramos todas tus respuestas. Gracias.</div>' : ''}
+    ${(ap.contrato && ap.contrato.aceptado) ? `<div class="note info">Aceptaste el contrato el ${fmtFechaHora(ap.contrato.fecha)}, así que los precios que ya respondiste quedaron <b>en firme</b>. Si necesitas cambiar alguno, escríbenos y lo vemos contigo.</div>` : ''}
     ${ap.items.map((i,ix)=>`
       <div class="pub-book ${i.decision==='aprobado'?'ok':i.decision==='rechazado'?'no':''}">
         <div style="display:flex;gap:12px">
@@ -2302,7 +2357,8 @@ function pintarPublica(){
               <span class="tag ${i.decision==='aprobado'?'t-verde':'t-rojo'}">${i.decision==='aprobado'?'Aprobado':'Propusiste otro precio'}</span>
               <span class="sub">${fmtFechaHora(i.fecha)}</span>
               <div class="spacer" style="flex:1"></div>
-              <button class="btn ghost sm" onclick="decidir(${ix},'pendiente')">Cambiar</button>
+              ${enFirme(ap,i) ? '<span class="tag t-gris">En firme</span>'
+                              : `<button class="btn ghost sm" onclick="decidir(${ix},'pendiente')">Cambiar</button>`}
             </div>
             ${i.precioSugerido?`<p class="sub" style="margin:7px 0 0">Tu propuesta: <b style="color:var(--verde)">${money(i.precioSugerido)}</b>${i.decision==='rechazado'?' · te recibirían '+money(i.precioSugerido*S.cfg.pctConsignante/100):''}</p>`:''}
             ${i.comentario?`<p class="sub" style="margin:4px 0 0">“${esc(i.comentario)}”</p>`:''}
@@ -2388,6 +2444,7 @@ let PUB_ABIERTO = -1;
 
 function decidir(ix, decision){
   const it = PUB.items[ix];
+  if (enFirme(PUB, it)) return toast('Ya aceptaste el contrato: este precio quedó en firme. Escríbenos y lo vemos contigo.','err');
   if (decision === 'pendiente'){
     it.decision='pendiente'; it.fecha=null; it.comentario='';
     delete it.precioSugerido; delete it.resuelto;
@@ -2408,6 +2465,7 @@ function cancelarDesacuerdo(){ PUB_ABIERTO = -1; pintarPublica(); }
    la librería, para que el panel muestre las dos cifras y se pueda negociar. */
 function enviarDesacuerdo(ix){
   const it = PUB.items[ix];
+  if (enFirme(PUB, it)) return toast('Ya aceptaste el contrato: este precio quedó en firme.','err');
   const campoP = $('#propPrecio'+ix), campoC = $('#propCom'+ix);
   const prop = campoP ? (parseFloat(campoP.value)||0) : 0;
   const com = campoC ? (campoC.value||'').trim() : '';
