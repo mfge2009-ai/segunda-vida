@@ -2621,18 +2621,42 @@ async function revisarWeb(avisar){
   return S.desfaseWeb;
 }
 
-/* Iniciar sesión en el proyecto de la web, solo para poder escribir. */
+/* Iniciar sesión en el proyecto de la web, solo para poder escribir.
+   El proyecto de la web usa correo y contraseña (no Google), así que son las
+   mismas credenciales del panel de administración del sitio. Las escribe la
+   dueña: la app solo se las pasa a Firebase y no las guarda en ningún lado. */
 async function conectarWeb(){
   const db = await appWeb();
-  if (!db) return toast('Primero hay que detectar la configuración de la web (Ajustes)','err');
-  try{
-    const app = firebase.app('web');
-    const prov = new firebase.auth.GoogleAuthProvider();
-    const res = await app.auth().signInWithPopup(prov);
-    S.webUser = res.user;
-    toast('Conectado a la web como ' + (res.user.email||''),'ok');
-    pintarTodo();
-  }catch(e){ toast('No se pudo conectar con la web: ' + (e.code||e.message),'err'); }
+  if (!db) return toast('No se pudo leer la configuración de la web. Revisa la dirección en Ajustes.','err');
+  if (S.webUser) {
+    if (!confirm('Ya estás conectada como ' + (S.webUser.email||'') + '.\n\n¿Cerrar esa sesión?')) return;
+    try{ await firebase.app('web').auth().signOut(); }catch(e){}
+    S.webUser = null; pintarTodo(); return toast('Sesión de la web cerrada','ok');
+  }
+  modal('Conectar con la página web', `
+    <p class="sub">Usa el mismo correo y contraseña con los que entras al panel de administración de la web. Sirven para que esta app pueda <b>corregir el catálogo</b> por ti; sin esto solo puede leerlo y avisarte.</p>
+    <label class="f"><span>Correo</span><input type="email" id="webMail" autocomplete="username" placeholder="tucorreo@gmail.com"></label>
+    <label class="f"><span>Contraseña</span><input type="password" id="webPass" autocomplete="current-password"></label>
+    <p class="sub">La contraseña va directo a Firebase y no se guarda en la app. La sesión queda abierta en este equipo hasta que la cierres.</p>
+  `, [
+    {t:'Cancelar', c:'ghost', f:cerrarModal},
+    {t:'Conectar', f:async()=>{
+      const mail = ($('#webMail').value||'').trim(), pass = $('#webPass').value||'';
+      if (!mail || !pass) return toast('Faltan el correo o la contraseña','err');
+      try{
+        const res = await firebase.app('web').auth().signInWithEmailAndPassword(mail, pass);
+        S.webUser = res.user; cerrarModal(); pintarTodo();
+        toast('Conectada a la web como ' + (res.user.email||''),'ok');
+        await revisarWeb(false); pintarTodo();
+      }catch(e){
+        const c = String(e.code||'');
+        toast(/wrong-password|invalid-credential|user-not-found/.test(c) ? 'Correo o contraseña incorrectos'
+            : /unauthorized-domain/.test(c) ? 'Falta autorizar este dominio en Firebase (Authentication → Dominios autorizados)'
+            : /too-many-requests/.test(c) ? 'Demasiados intentos: espera un momento'
+            : 'No se pudo conectar: ' + (e.code||e.message), 'err');
+      }
+    }}
+  ]);
 }
 
 function slugWeb(l){
