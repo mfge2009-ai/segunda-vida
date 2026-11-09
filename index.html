@@ -194,6 +194,9 @@ tr:hover td{background:#FDFCFA}
 .pub-book.no{border-color:#E7C9C6;background:var(--rojo-soft)}
 .pub-actions{display:flex;gap:8px;margin-top:11px}
 .pub-actions .btn{flex:1}
+.pub-contra{margin-top:12px;padding:12px;border-radius:var(--r-s);background:var(--surface-2);border:1px solid var(--line)}
+.pub-contra .f{margin-bottom:9px}
+.pub-contra textarea{min-height:62px}
 .sticky-bar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));box-shadow:0 -6px 24px rgba(43,33,24,.1);z-index:50}
 .sticky-bar .in{max-width:660px;margin:0 auto;display:flex;gap:10px;align-items:center}
 
@@ -440,6 +443,7 @@ details.sec > .in{padding:2px 13px 12px}
 <!-- ---------- APROBACIONES ---------- -->
 <section class="page" id="p-aprobaciones">
   <div class="hd"><div><h2>Aprobaciones de precio</h2><p class="sub">El consignante confirma cada precio antes de que el libro entre a la venta</p></div></div>
+  <div id="panelDesacuerdos"></div>
   <div id="panelRegularizar"></div>
   <div class="note info">Cada lote genera un enlace único. Puedes enviarlo por WhatsApp o Instagram, o abrirlo en tienda desde el celular o la tablet para que el consignante apruebe en el momento. Toda decisión queda registrada con fecha y hora.</div>
   <div id="listaAprob"></div>
@@ -989,7 +993,7 @@ function pintarTodo(){
 }
 function pintarBadges(){
   if (!S.cfg) return;
-  const pend = S.aprob.filter(a=>a.estado==='pendiente').length;
+  const pend = S.aprob.filter(a=>a.estado==='pendiente').length + itemsEnDesacuerdo().length;
   const bg = $('#bgApro'); bg.textContent = pend; bg.classList.toggle('hide', !pend);
 }
 
@@ -1993,7 +1997,112 @@ Recuerda: si el libro se vende recibes el ${S.cfg.pctConsignante}% del precio, y
   ]);
 }
 
+/* Libros cuyo precio la consignante no aprobó y que todavía esperan tu respuesta. */
+function itemsEnDesacuerdo(){
+  const out = [];
+  S.aprob.forEach(ap => (ap.items||[]).forEach((it, ix) => {
+    if (it.decision === 'rechazado' && !it.resuelto) out.push({ ap, it, ix });
+  }));
+  return out.sort((a,b)=>(b.it.fecha||'').localeCompare(a.it.fecha||''));
+}
+
+function pintarDesacuerdos(){
+  const cont = $('#panelDesacuerdos'); if (!cont) return;
+  const lista = itemsEnDesacuerdo();
+  if (!lista.length){ cont.innerHTML = ''; return; }
+  cont.innerHTML = `
+    <div class="card" style="border-color:var(--rojo)">
+      <h3>Precios que tus consignantes no aprobaron <span class="tag t-rojo">${lista.length}</span></h3>
+      <p class="sub">Estos libros salieron de exhibición porque su dueño no estuvo de acuerdo con el precio. Aquí ves qué propuso cada uno y respondes sin salir de la app.</p>
+      <div class="tw"><table><thead><tr>
+        <th>Consignante</th><th>Libro</th><th>Tu precio</th><th>Su propuesta</th><th>Lo que dijo</th><th>Cuándo</th><th></th>
+      </tr></thead><tbody>
+        ${lista.map(({ap,it,ix})=>{
+          const prop = Number(it.precioSugerido)||0;
+          const dif = prop ? prop - (Number(it.precio)||0) : 0;
+          const c = consPorId(ap.consignanteId) || {};
+          return `<tr>
+            <td><b>${esc(ap.consignanteNombre||'')}</b>${c.telefono?`<br><small style="color:var(--ink-3)">${esc(c.telefono)}</small>`:''}</td>
+            <td>${esc(it.titulo)}<br><small class="mono" style="color:var(--ink-3)">${esc(it.codigo||'')}</small></td>
+            <td><b>${money(it.precio)}</b></td>
+            <td>${prop ? `<b style="color:var(--verde)">${money(prop)}</b><br><small style="color:var(--ink-3)">${dif>0?'+':''}${money(dif)}</small>` : '<span class="sub">no propuso</span>'}</td>
+            <td class="sub" style="max-width:220px">${it.comentario?('“'+esc(it.comentario)+'”'):'—'}</td>
+            <td class="sub">${it.fecha?fmtFechaHora(it.fecha):'—'}</td>
+            <td style="text-align:right;white-space:nowrap">
+              ${prop?`<button class="btn sm" onclick="resolverDesacuerdo('${ap.id}',${ix},'aceptar')">Acepto ${money(prop)}</button> `:''}
+              <button class="btn ghost sm" onclick="abrirContraoferta('${ap.id}',${ix})">Contraofertar</button>
+              <button class="btn ghost sm" onclick="resolverDesacuerdo('${ap.id}',${ix},'mantener')">Mantener el mío</button>
+              ${c.telefono?`<button class="btn ghost sm" onclick="abrirWhatsapp('${esc(c.telefono)}','Hola ${esc((ap.consignanteNombre||'').split(' ')[0])}, sobre el precio de \"${esc(it.titulo)}\" que nos propusiste:')">WhatsApp</button>`:''}
+            </td></tr>`;
+        }).join('')}
+      </tbody></table></div>
+    </div>`;
+}
+
+/* Contraoferta: pones tu propio precio y el libro vuelve a quedar pendiente de que
+   la consignante lo apruebe desde el mismo enlace que ya tiene. */
+function abrirContraoferta(apId, ix){
+  const ap = S.aprob.find(a=>a.id===apId); if(!ap) return;
+  const it = ap.items[ix]; if(!it) return;
+  const prop = Number(it.precioSugerido)||0;
+  const medio = prop ? Math.round(((Number(it.precio)+prop)/2)*2)/2 : Number(it.precio)||0;
+  modal('Contraoferta · ' + it.titulo, `
+    <div class="grid g2" style="margin-bottom:12px">
+      <div class="kpi"><div class="n">${money(it.precio)}</div><div class="l">Tu precio</div></div>
+      <div class="kpi v"><div class="n">${prop?money(prop):'—'}</div><div class="l">Su propuesta</div></div>
+    </div>
+    <label class="f"><span>Precio que ofreces</span>
+      <input type="number" id="coPrecio" step="0.25" min="0" value="${medio.toFixed(2)}"></label>
+    <p class="sub">El libro vuelve a quedar pendiente de aprobación y la consignante lo ve en el mismo enlace que ya tiene. Avísale por WhatsApp para que lo revise.</p>
+  `, [
+    {t:'Cancelar', c:'ghost', f:cerrarModal},
+    {t:'Enviar contraoferta', f:()=>{ const v = parseFloat($('#coPrecio').value)||0; cerrarModal(); resolverDesacuerdo(apId, ix, 'contra', v); }}
+  ]);
+}
+
+async function resolverDesacuerdo(apId, ix, accion, precioNuevo){
+  const ap = S.aprob.find(a=>a.id===apId); if(!ap) return;
+  const it = ap.items[ix]; if(!it) return;
+  const l = libroPorId(it.libroId);
+  const ahora = new Date().toISOString();
+
+  if (accion === 'aceptar' || accion === 'contra'){
+    const pr = accion === 'aceptar' ? (Number(it.precioSugerido)||0) : (Number(precioNuevo)||0);
+    if (!pr) return toast('Falta el precio','err');
+    if (l){
+      const o = Object.assign({}, l);
+      o.precioFinal = pr;
+      delete o.motivoRechazo;
+      if (accion === 'aceptar'){
+        o.aprobacion = { decision:'aprobado', fecha:ahora, canal:'acuerdo',
+                         comentario:'Precio propuesto por el consignante y aceptado por la librería' };
+        o.estado = 'aprobado';
+        o.historial = (o.historial||[]).concat([{ f:ahora, e:'aprobado', u:'acuerdo de precio' }]);
+      } else {
+        delete o.aprobacion;
+        o.estado = 'pendiente_aprobacion';
+        o.historial = (o.historial||[]).concat([{ f:ahora, e:'pendiente_aprobacion', u:'contraoferta de la librería' }]);
+      }
+      const g = await DB.guardar(COL.libros, o);
+      const i = S.libros.findIndex(x=>x.id===g.id); if (i>=0) S.libros[i] = g;
+    }
+    it.precio = pr;
+    if (accion === 'aceptar'){ it.decision = 'aprobado'; it.resuelto = true; }
+    else { it.decision = 'pendiente'; it.fecha = null; it.contraoferta = { precio:pr, fecha:ahora }; }
+  } else {
+    it.resuelto = true;                 // se mantiene el precio de la librería
+  }
+  it.resueltoEl = ahora;
+  ap.estado = (ap.items||[]).some(i2=>i2.decision==='pendiente') ? 'pendiente' : 'completa';
+  await DB.guardar(COL.aprob, ap);
+  pintarTodo();
+  toast(accion === 'aceptar' ? 'Precio actualizado y aprobado · publícalo cuando quieras'
+      : accion === 'contra'  ? 'Contraoferta lista · avísale por WhatsApp para que la revise'
+      : 'Se mantiene tu precio. El libro queda fuera de exhibición.', 'ok');
+}
+
 function pintarAprobaciones(){
+  pintarDesacuerdos();
   // Consignantes con libros exhibiéndose sin aprobación de precio registrada
   const pendientes = S.cons.map(c => ({ c, libros: librosSinAprobacion(c.id) })).filter(x => x.libros.length);
   $('#panelRegularizar').innerHTML = !pendientes.length ? '' : `
@@ -2028,9 +2137,10 @@ function pintarAprobaciones(){
         <span class="tag t-rojo">${no} rechazado(s)</span>
         <span class="tag t-gris">${pe} sin responder</span>
       </div>
-      <div class="tw"><table><thead><tr><th>Código</th><th>Libro</th><th>Precio</th><th>Decisión</th><th>Fecha y hora</th><th>Comentario</th></tr></thead><tbody>
+      <div class="tw"><table><thead><tr><th>Código</th><th>Libro</th><th>Precio</th><th>Su propuesta</th><th>Decisión</th><th>Fecha y hora</th><th>Comentario</th></tr></thead><tbody>
         ${ap.items.map(i=>`<tr><td class="mono">${esc(i.codigo)}</td><td>${esc(i.titulo)}</td><td>${money(i.precio)}</td>
-          <td><span class="tag ${i.decision==='aprobado'?'t-verde':i.decision==='rechazado'?'t-rojo':'t-gris'}">${i.decision==='pendiente'?'Sin responder':i.decision==='aprobado'?'Aprobado':'Rechazado'}</span></td>
+          <td>${i.precioSugerido?`<b style="color:var(--verde)">${money(i.precioSugerido)}</b>`:'<span class="sub">—</span>'}</td>
+          <td><span class="tag ${i.decision==='aprobado'?'t-verde':i.decision==='rechazado'?'t-rojo':'t-gris'}">${i.decision==='pendiente'?'Sin responder':i.decision==='aprobado'?'Aprobado':'No aprobado'}</span>${i.resuelto?' <span class="tag t-gris">resuelto</span>':''}</td>
           <td class="sub">${i.fecha?fmtFechaHora(i.fecha):'—'}</td><td class="sub">${esc(i.comentario||'')}</td></tr>`).join('')}
       </tbody></table></div>
       <div class="row" style="margin-top:11px">
@@ -2055,7 +2165,7 @@ async function sincronizarAprobaciones(avisar){
         if (ap.tipo === 'regularizacion'){
           if (l.aprobacion) continue;
           l.aprobacion = { decision:it.decision, fecha:it.fecha, canal:it.canal||'enlace',
-                           comentario:it.comentario||'', regularizacion:true };
+                           comentario:it.comentario||'', precioSugerido:it.precioSugerido||null, regularizacion:true };
           if (it.decision === 'rechazado'){
             l.motivoRechazo = 'Precio no aprobado por el consignante';
             if (l.estado !== 'vendido' && l.estado !== 'pagado'){
@@ -2071,7 +2181,7 @@ async function sincronizarAprobaciones(avisar){
         }
         const destino = it.decision === 'aprobado' ? 'aprobado' : 'rechazado';
         if (l.estado === 'pendiente_aprobacion'){
-          l.aprobacion = { decision:it.decision, fecha:it.fecha, canal:it.canal||'enlace', comentario:it.comentario||'' };
+          l.aprobacion = { decision:it.decision, fecha:it.fecha, canal:it.canal||'enlace', comentario:it.comentario||'', precioSugerido:it.precioSugerido||null };
           if (it.decision === 'rechazado') l.motivoRechazo = 'Precio no aprobado por el consignante';
           l.estado = destino;
           l.historial = (l.historial||[]).concat([{ f:it.fecha||new Date().toISOString(), e:destino, u:'consignante' }]);
@@ -2146,10 +2256,10 @@ function pintarPublica(){
       <h1>${esc(nombre?('Hola, '+nombre):'Tus libros')} 🌿</h1>
       ${ap.tipo === 'regularizacion'
         ? `<p>Tus libros ya están en exhibición en La Madriguera. Estamos poniendo al día el registro de precios y queremos dejar por escrito tu conformidad con cada uno.
-           Si el libro se vende recibes el <b>${S.cfg.pctConsignante}%</b> de ese precio. Si algún precio no te convence, márcalo y lo conversamos antes de seguir exhibiéndolo.</p>`
+           Si el libro se vende recibes el <b>${S.cfg.pctConsignante}%</b> de ese precio. Si algún precio no te convence, dinos cuál te parecería justo y lo conversamos antes de seguir exhibiéndolo.</p>`
         : `<p>Estos son los libros que recibimos y el precio de venta que proponemos para cada uno.
            Si el libro se vende recibes el <b>${S.cfg.pctConsignante}%</b> de ese precio, y la exhibición dura <b>${S.cfg.plazoDias} días</b>.
-           Aprueba los que estés de acuerdo. Si alguno no te convence, márcalo y déjanos tu comentario: lo conversamos.</p>`}
+           Aprueba los que estés de acuerdo. Si alguno no te convence, dinos qué precio te parecería justo: lo revisamos y te respondemos.</p>`}
     </div>
     ${ap.estado==='completa' ? '<div class="note ok">Ya registramos todas tus respuestas. Gracias.</div>' : ''}
     ${ap.items.map((i,ix)=>`
@@ -2169,17 +2279,33 @@ function pintarPublica(){
             </div>
           </div>
         </div>
-        ${i.decision==='pendiente' ? `
+        ${i.contraoferta && i.decision==='pendiente' ? `<div class="note ok" style="margin-top:10px">
+            Revisamos tu propuesta y te ofrecemos este nuevo precio de ${money(i.precio)}. Dinos si ahora sí estás de acuerdo.</div>` : ''}
+        ${i.decision==='pendiente' ? (PUB_ABIERTO===ix ? `
+          <div class="pub-contra">
+            <p class="sub" style="margin:0 0 9px"><b>¿Qué precio te parecería justo?</b> Lo revisamos y te respondemos por WhatsApp.</p>
+            <label class="f"><span>Tu precio sugerido</span>
+              <input type="number" id="propPrecio${ix}" step="0.5" min="0" inputmode="decimal" placeholder="Ej: ${(i.precio*0.8).toFixed(2)}"></label>
+            <label class="f"><span>¿Por qué? <em>— opcional</em></span>
+              <textarea id="propCom${ix}" placeholder="Ej: está como nuevo, lo compré hace dos meses"></textarea></label>
+            <div class="pub-actions">
+              <button class="btn" onclick="enviarDesacuerdo(${ix})">Enviar mi propuesta</button>
+              <button class="btn ghost" onclick="cancelarDesacuerdo()">Cancelar</button>
+            </div>
+          </div>` : `
           <div class="pub-actions">
             <button class="btn" onclick="decidir(${ix},'aprobado')">Apruebo este precio</button>
-            <button class="btn ghost" onclick="decidir(${ix},'rechazado')">No estoy de acuerdo</button>
-          </div>` : `
-          <div class="row" style="margin-top:10px">
-            <span class="tag ${i.decision==='aprobado'?'t-verde':'t-rojo'}">${i.decision==='aprobado'?'Aprobado':'No aprobado'}</span>
-            <span class="sub">${fmtFechaHora(i.fecha)}</span>
-            ${i.comentario?`<span class="sub">· ${esc(i.comentario)}</span>`:''}
-            <div class="spacer" style="flex:1"></div>
-            <button class="btn ghost sm" onclick="decidir(${ix},'pendiente')">Cambiar</button>
+            <button class="btn ghost" onclick="decidir(${ix},'rechazado')">Propongo otro precio</button>
+          </div>`) : `
+          <div style="margin-top:10px">
+            <div class="row">
+              <span class="tag ${i.decision==='aprobado'?'t-verde':'t-rojo'}">${i.decision==='aprobado'?'Aprobado':'Propusiste otro precio'}</span>
+              <span class="sub">${fmtFechaHora(i.fecha)}</span>
+              <div class="spacer" style="flex:1"></div>
+              <button class="btn ghost sm" onclick="decidir(${ix},'pendiente')">Cambiar</button>
+            </div>
+            ${i.precioSugerido?`<p class="sub" style="margin:7px 0 0">Tu propuesta: <b style="color:var(--verde)">${money(i.precioSugerido)}</b>${i.decision==='rechazado'?' · te recibirían '+money(i.precioSugerido*S.cfg.pctConsignante/100):''}</p>`:''}
+            ${i.comentario?`<p class="sub" style="margin:4px 0 0">“${esc(i.comentario)}”</p>`:''}
           </div>`}
       </div>`).join('')}
     <div class="card" style="margin-top:16px">
@@ -2258,16 +2384,42 @@ async function aceptarContratoPublico(){
   if (ok){ toast('Contrato aceptado. ¡Gracias!','ok'); pintarPublica(); }
 }
 
+let PUB_ABIERTO = -1;
+
 function decidir(ix, decision){
   const it = PUB.items[ix];
-  if (decision === 'pendiente'){ it.decision='pendiente'; it.fecha=null; it.comentario=''; return pintarPublica(); }
-  if (decision === 'rechazado'){
-    const c = prompt('¿Qué precio te parecería justo, o por qué no estás de acuerdo? (opcional)');
-    it.comentario = c || '';
+  if (decision === 'pendiente'){
+    it.decision='pendiente'; it.fecha=null; it.comentario='';
+    delete it.precioSugerido; delete it.resuelto;
+    PUB_ABIERTO = -1; return pintarPublica();
   }
+  if (decision === 'rechazado'){ PUB_ABIERTO = ix; return pintarPublica(); }
   it.decision = decision;
   it.fecha = new Date().toISOString();
   it.canal = 'enlace';
+  PUB_ABIERTO = -1;
+  pintarPublica();
+  guardarDecisiones(true);
+}
+
+function cancelarDesacuerdo(){ PUB_ABIERTO = -1; pintarPublica(); }
+
+/* La consignante propone su propio precio: queda guardado aparte del precio de
+   la librería, para que el panel muestre las dos cifras y se pueda negociar. */
+function enviarDesacuerdo(ix){
+  const it = PUB.items[ix];
+  const campoP = $('#propPrecio'+ix), campoC = $('#propCom'+ix);
+  const prop = campoP ? (parseFloat(campoP.value)||0) : 0;
+  const com = campoC ? (campoC.value||'').trim() : '';
+  if (!prop && !com) return toast('Escribe un precio o cuéntanos por qué','err');
+  if (prop && prop <= 0) return toast('El precio debe ser mayor que cero','err');
+  it.decision = 'rechazado';
+  it.precioSugerido = prop || null;
+  it.comentario = com;
+  it.fecha = new Date().toISOString();
+  it.canal = 'enlace';
+  delete it.resuelto;
+  PUB_ABIERTO = -1;
   pintarPublica();
   guardarDecisiones(true);
 }
@@ -2472,6 +2624,8 @@ function pintarPanel(){
   if (cnt('aprobado')) alertas.push(['t-verde', cnt('aprobado')+' libro(s) aprobados listos para publicar', "irA('inventario')"]);
   if (porPagar > 0) alertas.push(['t-terra', money(porPagar)+' por liquidar a consignantes', "irA('ventas')"]);
   if (cnt('vencido')) alertas.push(['t-rojo', cnt('vencido')+' libro(s) vencidos: avisar para retiro o extensión', "irA('inventario')"]);
+  const desac = itemsEnDesacuerdo().length;
+  if (desac) alertas.push(['t-rojo', desac + ' libro(s) con precio no aprobado esperan tu respuesta', "irA('aprobaciones')"]);
   const enEspera = L.filter(l => l.enEspera && !['vendido','pagado','retirado','rechazado'].includes(l.estado));
   const liberables = enEspera.filter(l => l.stockNuevoActual === 0);
   if (liberables.length) alertas.push(['t-verde', liberables.length + ' libro(s) en espera ya se pueden publicar: se acabó tu stock nuevo', "verEnEspera()"]);
