@@ -413,6 +413,7 @@ details.sec > .in{padding:2px 13px 12px}
     <div class="row" style="margin-top:12px">
       <button class="btn" onclick="enviarAAprobacion()">3 · Enviar precios a aprobación</button>
       <button class="btn ghost" onclick="pdfDesdeIngreso()">Descargar contrato + anexo (PDF)</button>
+      <button class="btn ghost" onclick="etiquetasDesdeIngreso()">Imprimir anexo de etiquetas</button>
       <button class="btn ghost" onclick="limpiarLote()">Cerrar lote</button>
     </div>
   </div>
@@ -423,7 +424,7 @@ details.sec > .in{padding:2px 13px 12px}
   <div class="hd"><div><h2>Inventario</h2><p class="sub">Todos los libros del programa y su estado</p></div><div class="spacer"></div>
     <button class="btn ghost" onclick="irA('exportar')">Exportar CSV</button>
     <button class="btn ghost" onclick="irA('documentos')">Contratos y anexos</button>
-    <button class="btn ghost" onclick="abrirEtiquetas(seleccionados())">Etiquetas con código de barras</button></div>
+    <button class="btn ghost" onclick="etiquetasDesdeInventario()">Etiquetas con código de barras</button></div>
   <div class="filters">
     <input type="text" id="fInv" placeholder="Buscar por título, autor, ISBN, código o consignante…" oninput="INV_LIM=200;deb(pintarInventario)">
     <select id="fInvEstado" onchange="pintarInventario()"></select>
@@ -1818,6 +1819,17 @@ function pdfDesdeIngreso(){
   const id = $('#ingCons').value;
   if (!id) return toast('Primero elige el consignante','err');
   descargarPDF(id, 'completo');
+}
+
+function etiquetasDesdeIngreso(){
+  const cons = consPorId($('#ingCons').value);
+  if (!cons) return toast('Primero elige el consignante','err');
+  const ids = S.lote.filter(id => {
+    const l = libroPorId(id);
+    return l && l.consignanteId === cons.id && l.aceptado !== false && l.estado !== 'rechazado';
+  });
+  if (!ids.length) return toast('No hay libros aceptados en el lote para etiquetar','err');
+  return abrirEtiquetas(ids, 'Anexo de etiquetas del lote · ' + nombreCons(cons));
 }
 
 /* ============================ INVENTARIO ============================ */
@@ -4063,24 +4075,41 @@ function svgEAN13(code){
 }
 
 /* ---- hoja de etiquetas para pegar sobre el ISBN impreso ---- */
-let ETQ_LIBROS = [], ETQ_GUIAS = true;
+let ETQ_LIBROS = [], ETQ_GUIAS = true, ETQ_TITULO = '';
 
-async function abrirEtiquetas(ids){
-  const base = (ids && ids.length)
+function etiquetasDesdeInventario(){
+  const ids = seleccionados();
+  return abrirEtiquetas(ids.length ? ids : undefined);
+}
+
+async function abrirEtiquetas(ids, titulo = ''){
+  const base = ids
     ? ids.map(libroPorId).filter(Boolean)
     : S.libros.filter(l => ['aprobado','publicado','vencido'].includes(l.estado));
-  ETQ_LIBROS = base.filter(l => asignarBarras(l))
-                   .sort((a,b)=>(a.codigo||'').localeCompare(b.codigo||''));
-  if (!ETQ_LIBROS.length) return toast('No hay libros para etiquetar. Selecciona filas o publica libros primero.','err');
-  // Se guarda el código de barras recién asignado para que no cambie nunca más
-  for (const l of ETQ_LIBROS){
-    if (l.barrasGuardado) continue;
+  const libros = [];
+  for (const libro of base){
+    const l = Object.assign({}, libro);
+    if (!asignarBarras(l)){
+      if (titulo) return toast('Falta un código de barras para ' + l.titulo,'err');
+      continue;
+    }
+    if (libro.barrasGuardado && libro.barras){
+      libros.push(libro);
+      continue;
+    }
     try{
-      const g = await DB.guardar(COL.libros, Object.assign({}, l, { barrasGuardado:true }));
-      S.libros[S.libros.findIndex(x=>x.id===g.id)] = g;
-    }catch(e){ }
+      const g = await DB.guardar(COL.libros, Object.assign(l, { barrasGuardado:true }));
+      const i = S.libros.findIndex(x=>x.id===g.id);
+      if (i >= 0) S.libros[i] = g;
+      libros.push(g);
+    }catch(e){
+      return toast('No se pudo guardar el código de barras de ' + l.titulo + '. Intenta de nuevo.','err');
+    }
   }
-  ETQ_LIBROS = ETQ_LIBROS.map(l => libroPorId(l.id) || l);
+  if (!libros.length) return toast(titulo ? 'No hay libros para etiquetar en este lote' :
+    'No hay libros para etiquetar. Selecciona filas o publica libros primero.','err');
+  ETQ_LIBROS = libros.sort((a,b)=>(a.codigo||'').localeCompare(b.codigo||''));
+  ETQ_TITULO = titulo;
   pintarEtiquetas();
   $('#hojaEtiquetas').classList.remove('hide');
   document.body.classList.add('imp-etq');
@@ -4106,6 +4135,7 @@ function pintarEtiquetas(){
   };
   $('#hojaEtiquetas').innerHTML =
     '<div class="barra">'
+    + (ETQ_TITULO ? '<b>' + esc(ETQ_TITULO) + '</b>' : '')
     + '<b style="font-size:13px">' + ETQ_LIBROS.length + ' etiqueta(s) · ' + hojas.length + ' hoja(s) A4</b>'
     + '<label class="check" style="margin:0;padding:6px 10px"><input type="checkbox" ' + (ETQ_GUIAS?'checked':'') + ' onchange="toggleGuias(this)"><span>Guías de corte</span></label>'
     + '<button class="btn" onclick="window.print()">Imprimir</button>'
